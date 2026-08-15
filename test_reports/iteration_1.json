@@ -1,0 +1,32 @@
+{
+  "summary": "First-finish smoke test of +58BarberStudio. Backend endpoints (business, services, auth, working-hours, availability, appointments, blockers, clients) verified via public URL. Frontend Home, protected /admin route, admin login (wrong+right), booking wizard end-to-end (4 steps -> WhatsApp confirmation) all functional.",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "GET /api/business returns business info (name, phone, whatsapp, instagram, address)",
+    "GET /api/services returns 6 seeded services with id/name/price_eur/duration_min",
+    "POST /api/auth/login wrong password -> 401; correct -> JWT + user{role:admin}",
+    "GET /api/auth/me with Bearer -> admin user; without token -> 401",
+    "GET /api/working-hours returns 7 days config",
+    "GET /api/availability returns 40 slots for tomorrow (10 min service)",
+    "POST /api/appointments with accepted_policy=false -> 400 'Debes aceptar la política del 50%'",
+    "POST /api/appointments creates appointment (uses schema: service_id/date/start/client_name/client_phone/accepted_policy)",
+    "Double-booking same slot -> 409 'Esa hora ya no está disponible'",
+    "GET /api/availability after booking excludes taken slot (40 -> 39)",
+    "POST /api/appointments/{id}/cancel wrong phone -> 403; correct phone (>12h) -> 200 ok",
+    "GET /api/clients (admin) lists client with appointments_count=1; anon -> 401",
+    "POST /api/services anon -> 401 (admin CRUD protected)",
+    "POST /api/blockers full-day (start=null,end=null) -> /api/availability returns 0 slots for that date; DELETE blocker -> 200",
+    "Frontend / loads: hero-book-btn visible, 6 service cards, floating contact buttons visible",
+    "Frontend /admin (no token) redirects to /admin/login",
+    "Frontend admin login: wrong pw stays on login; correct credentials navigates to /admin dashboard with tabs (Agenda/Servicios/Horario/Bloqueos/Clientes) visible",
+    "Frontend /reservar 4-step wizard completes: pick service -> pick date -> pick time -> fill name/phone -> policy required (submit without policy does NOT create appointment) -> with policy shows success screen with wa.me confirm-whatsapp-btn"
+  ],
+  "failed": [],
+  "action_items": [
+    "Note: review_request documented booking payload keys as 'time'/'name'/'phone' but actual API schema uses 'start'/'client_name'/'client_phone' (per server.py AppointmentIn). Frontend already uses correct schema. No fix needed—just documentation clarification for future testers."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "test_credentials": "OK - /app/memory/test_credentials.md present; admin login verified"
+}

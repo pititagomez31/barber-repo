@@ -1,0 +1,102 @@
+{
+  "project": "+58BarberStudio",
+  "app_type": "hybrid_fullstack",
+  "theme": "dark",
+  "archetype": "ARCHETYPE 5: LUXURY (Dark, Cinematic, Moody)",
+  "typography": {
+    "headings": "Playfair Display",
+    "body": "Manrope",
+    "rules": [
+      "NO INTER for headings. Use Playfair Display for a masculine, premium serif feel.",
+      "Headings (Size > 32px) MUST use tight letter spacing (tracking-tight).",
+      "Overlines and Labels MUST be Uppercase + Tiny + Wide Spacing (tracking-[0.2em]).",
+      "Line Height: Tight (leading-none) for headers, Loose (leading-relaxed) for body.",
+      "Use fluid typography scaling (text-4xl to text-6xl max for heroes)."
+    ]
+  },
+  "colors": {
+    "background_base": "#14141A",
+    "background_surface": "#1A1A1E",
+    "background_elevated": "#222228",
+    "primary_accent": "#D4B77A",
+    "primary_hover": "#C2A366",
+    "text_main": "#F5F5F5",
+    "text_muted": "#A1A1AA",
+    "border_subtle": "#2A2A32",
+    "rules": [
+      "NO pure black (#000000) or pure white (#FFFFFF) for backgrounds.",
+      "NO purple/violet 'AI slop' gradients. Stick to solid dark grays (Graphite) with Soft Gold accents.",
+      "Focus on contrast and hierarchy using different shades of graphite."
+    ]
+  },
+  "visual_enhancers": {
+    "textures": "Apply a subtle noise/grain overlay (CSS radial-gradient + noise SVG filter) to the Hero and main dark surfaces to avoid digital flatness.",
+    "neumorphism": "Soft Neumorphism (Neumorphism suave) - achieve this through layered, diffuse dark shadows (e.g., shadow-[4px_4px_10px_#0d0d10,-4px_-4px_10px_#1b1b24]) combined with a 1px crisp inner border (border-white/5) for definition.",
+    "glassmorphism": "Use for the sticky mobile CTA, floating contact buttons, and fixed navigation (backdrop-blur-xl bg-[#14141A]/80 with border-white/5).",
+    "borders": "Always use 1px solid subtle borders on cards to ground them; do not rely solely on shadows."
+  },
+  "layouts": {
+    "marketing_public": "Mobile-first. Asymmetrical bento grids for galleries and services. Generous spacing (p-12 to p-24). Large, edge-to-edge photography in hero. Include a persistent/sticky 'RESERVAR CITA' CTA at the bottom for mobile.",
+    "booking_wizard": "Frictionless multi-step flow (Service -> Date -> Time -> Details/Policy). Clean, zero distractions. Keep interactions to maximum 3-4 taps.",
+    "admin_dashboard": "High-density grid setup (Grid Mode B). Sharp functional UI. Cardless or minimal-border styling for tables/calendars (Day/Week/Month). Optimize for speed and readability."
+  },
+  "components": {
+    "buttons": "Primary CTA must be Soft Gold (#D4B77A) with dark graphite text. Sharp or slightly rounded corners (rounded-md), not fully pill-shaped. Add micro-interactions (scale-down on active, glow on hover).",
+    "cards": "Services and Testimonial cards should have a flat graphite background (#1A1A1E), a 1px border (#2A2A32), and lift slightly on hover.",
+    "booking_elements": "Use customized Shadcn UI primitives (Calendar, Select, Form). Restyle them to remove default Vercel aesthetic, applying the Graphite/Gold palette."
+  },
+  "motion": {
+    "marketing": "Lenis smooth scrolling. Subtle parallax on the hero image. Staggered fade-up entrances for the services bento grid.",
+    "interactions": "Micro-animations on hover/click for all buttons and cards. Use Framer Motion for smooth lateral slide transitions in the booking wizard."
+  },
+  "accessibility": {
+    "contrast": "Ensure text over images uses dark gradients or backdrop filters to maintain APCA readability standards. Never use fully transparent backgrounds where text exists.",
+    "testing": "CRITICAL: All interactive elements, inputs, and key informational nodes MUST include a `data-testid` attribute (e.g., `data-testid=\"book-appointment-btn\"`)."
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.pexels.com/photos/4625626/pexels-photo-4625626.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Barber performing a stylish haircut. Dark, moody, high quality."
+    },
+    "interior_gallery_1": {
+      "url": "https://images.unsplash.com/photo-1576168056582-0a851a87ab8e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzN8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBkYXJrJTIwYmFyYmVyc2hvcCUyMGludGVyaW9yfGVufDB8fHx8MTc4Njc5NDc4MXww&ixlib=rb-4.1.0&q=85",
+      "description": "Dark leather barber chairs in a modern room."
+    },
+    "tools_gallery_2": {
+      "url": "https://images.unsplash.com/photo-1675599193741-e6f078a65fbd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxiYXJiZXIlMjB0b29scyUyMHZpbnRhZ2UlMjBzY2lzc29yc3xlbnwwfHx8fDE3ODY3OTQ3ODB8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Vintage scissors on a wooden surface."
+    },
+    "service_haircut": {
+      "url": "https://images.unsplash.com/photo-1582771498000-8ad44e6c84db?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHw0fHxiYXJiZXIlMjBjdXR0aW5nJTIwaGFpciUyMHBvcnRyYWl0fGVufDB8fHx8MTc4Njc0NTE2MHww&ixlib=rb-4.1.0&q=85",
+      "description": "Man getting a haircut."
+    }
+  },
+  "instructions_to_main_agent": [
+    "The project uses React/Vite with JavaScript (.js/.jsx), NOT TypeScript. Output all code in standard JS.",
+    "Establish two distinct routing zones: The public marketing/booking side (/) and the private admin dashboard (/admin).",
+    "Inject a floating WhatsApp/Instagram contact button on the public pages.",
+    "The hero section needs the main 'RESERVAR CITA' (Book Appointment) CTA heavily emphasized. Make it sticky on mobile.",
+    "Implement the 3-step booking wizard seamlessly (can be a modal or dedicated route).",
+    "Embed a Google Maps iframe for Tenerife in the location section.",
+    "For the admin panel, include a calendar view (Day/Week/Month), schedule settings, CRUD for services, and a client list.",
+    "Use 'Europe/Madrid' timezone logic where applicable, and EUR currency.",
+    "Everything must be localized to Spanish."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: `transition: all`. Always add transitions for specific interactive elements excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add `.App { text-align: center; }`.",
+    "Always use modern button styles like sharp or slightly rounded with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states are highly encouraged.",
+    "Main agent relies on image URLs. Missing categories = placeholder text which is FORBIDDEN. Use the provided image_urls.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Use `sonner` for toasts in /app/src/components/ui/sonner.js."
+  ]
+}
