@@ -2,17 +2,18 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Scissors, Clock, Star, MapPin, Instagram, Phone, ChevronRight, Award, Sparkles } from "lucide-react";
+import { Scissors, Clock, Star, MapPin, Phone, ChevronRight, Award } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import FloatingContact from "@/components/FloatingContact";
 import StickyBookCTA from "@/components/StickyBookCTA";
 import Footer from "@/components/Footer";
 import { api } from "@/lib/api";
 
-const HERO_IMG = "https://images.pexels.com/photos/4625626/pexels-photo-4625626.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
-const GAL1 = "https://images.unsplash.com/photo-1576168056582-0a851a87ab8e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzN8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBkYXJrJTIwYmFyYmVyc2hvcCUyMGludGVyaW9yfGVufDB8fHx8MTc4Njc5NDc4MXww&ixlib=rb-4.1.0&q=85";
-const GAL2 = "https://images.unsplash.com/photo-1675599193741-e6f078a65fbd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxiYXJiZXIlMjB0b29scyUyMHZpbnRhZ2UlMjBzY2lzc29yc3xlbnwwfHx8fDE3ODY3OTQ3ODB8MA&ixlib=rb-4.1.0&q=85";
-const GAL3 = "https://images.unsplash.com/photo-1582771498000-8ad44e6c84db?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHw0fHxiYXJiZXIlMjBjdXR0aW5nJTIwaGFpciUyMHBvcnRyYWl0fGVufDB8fHx8MTc4Njc0NTE2MHww&ixlib=rb-4.1.0&q=85";
+const HERO_IMG = "https://customer-assets-39nsmqrw.emergentagent.net/job_studio-citas/artifacts/mbci8sqh_WhatsApp%20Image%202026-08-24%20at%209.32.06%20PM%20%281%29.jpeg";
+const GAL1 = "https://customer-assets-39nsmqrw.emergentagent.net/job_studio-citas/artifacts/1rosdehm_WhatsApp%20Image%202026-08-24%20at%209.31.59%20PM%20%281%29.jpeg";
+const GAL2 = "https://customer-assets-39nsmqrw.emergentagent.net/job_studio-citas/artifacts/73nx1fl0_WhatsApp%20Image%202026-08-24%20at%209.32.06%20PM%20%282%29.jpeg";
+const GAL3 = "https://customer-assets-39nsmqrw.emergentagent.net/job_studio-citas/artifacts/fxk3r3ka_WhatsApp%20Image%202026-08-24%20at%209.32.06%20PM.jpeg";
+const GAL4 = "https://customer-assets-39nsmqrw.emergentagent.net/job_studio-citas/artifacts/modeqpqu_WhatsApp%20Image%202026-08-24%20at%209.31.59%20PM%20%282%29.jpeg";
 
 const TESTIMONIALS = [
   { name: "Carlos M.", text: "El mejor corte que me han hecho en Tenerife. Ambiente top y trato de 10.", rating: 5 },
@@ -42,10 +43,10 @@ export default function Home() {
         </div>
         <div className="relative max-w-7xl mx-auto px-6 md:px-10 pt-32 pb-16 grid md:grid-cols-2 gap-10 items-center">
           <div className="fade-up">
-            <p className="tracking-overline uppercase text-xs text-[#D4B77A] mb-5" data-testid="hero-eyebrow">Tenerife · desde 2021</p>
-            <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl leading-none tracking-tight" data-testid="hero-title">
-              El corte que <br />
-              <span className="text-[#D4B77A]">te define</span>.
+            <p className="tracking-overline uppercase text-xs text-[#D4B77A] mb-5" data-testid="hero-eyebrow">Tenerife · Heber</p>
+            <h1 className="font-display text-6xl sm:text-7xl lg:text-8xl leading-[0.95] tracking-tight" data-testid="hero-title">
+              El corte<br />
+              que <span className="text-[#D4B77A]">te define</span>.
             </h1>
             <p className="mt-6 text-neutral-300 max-w-md leading-relaxed" data-testid="hero-subtitle">
               Cortes precisos, barba clásica y una experiencia sin prisas. Reserva tu hora en menos de 30 segundos.
@@ -76,7 +77,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="max-w-2xl mb-14">
             <p className="tracking-overline uppercase text-xs text-[#D4B77A] mb-4">Servicios</p>
-            <h2 className="font-display text-4xl md:text-5xl tracking-tight">Elige lo que necesitas hoy</h2>
+            <h2 className="font-display text-5xl md:text-6xl tracking-tight italic leading-[1.05]">Elige lo que<br />necesitas hoy.</h2>
             <p className="text-neutral-400 mt-4 leading-relaxed">Precios claros, duración honesta, sin sorpresas.</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -109,21 +110,20 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="mb-14 max-w-2xl">
             <p className="tracking-overline uppercase text-xs text-[#D4B77A] mb-4">Nuestro trabajo</p>
-            <h2 className="font-display text-4xl md:text-5xl tracking-tight">El estudio & el arte</h2>
+            <h2 className="font-display text-5xl md:text-6xl tracking-tight italic leading-[1.05]">El estudio<br />& el arte.</h2>
           </div>
           <div className="grid grid-cols-4 grid-rows-2 gap-4 h-[520px]">
             <div className="col-span-2 row-span-2 relative overflow-hidden rounded-lg border border-[#2A2A32]" data-testid="gallery-item-0">
-              <img src={GAL1} alt="Interior barbería" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+              <img src={GAL1} alt="Corte de Heber" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
             </div>
             <div className="col-span-2 relative overflow-hidden rounded-lg border border-[#2A2A32]" data-testid="gallery-item-1">
-              <img src={GAL3} alt="Corte de pelo" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+              <img src={GAL2} alt="Trabajo del barbero" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
             </div>
             <div className="col-span-1 relative overflow-hidden rounded-lg border border-[#2A2A32]" data-testid="gallery-item-2">
-              <img src={GAL2} alt="Herramientas" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+              <img src={GAL4} alt="Detalle de fade" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
             </div>
-            <div className="col-span-1 relative overflow-hidden rounded-lg border border-[#2A2A32] neumo p-6 flex flex-col justify-between" data-testid="gallery-item-3">
-              <Sparkles className="h-6 w-6 text-[#D4B77A]" />
-              <p className="font-display text-lg leading-tight">Detalle en cada milímetro.</p>
+            <div className="col-span-1 relative overflow-hidden rounded-lg border border-[#2A2A32]" data-testid="gallery-item-3">
+              <img src={GAL3} alt="Barba y navaja" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
             </div>
           </div>
         </div>
@@ -133,17 +133,17 @@ export default function Home() {
       <section id="sobre" className="py-24 px-6" data-testid="about-section">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 items-center">
           <div className="relative">
-            <img src={GAL3} alt="El barbero" className="w-full h-[480px] object-cover rounded-lg border border-[#2A2A32]" />
+            <img src={GAL3} alt="Heber trabajando" className="w-full h-[520px] object-cover rounded-lg border border-[#2A2A32]" />
             <div className="absolute -bottom-6 -right-6 neumo px-6 py-4 rounded-lg hidden md:block">
-              <div className="font-display text-2xl text-[#D4B77A]">+5 años</div>
-              <div className="text-xs tracking-overline uppercase text-neutral-500">de oficio</div>
+              <div className="font-display italic text-3xl text-[#D4B77A]">Heber</div>
+              <div className="text-xs tracking-overline uppercase text-neutral-500">tu barbero</div>
             </div>
           </div>
           <div>
             <p className="tracking-overline uppercase text-xs text-[#D4B77A] mb-4">El barbero</p>
-            <h2 className="font-display text-4xl md:text-5xl tracking-tight">Manos de tijera, cabeza de estilo.</h2>
-            <p className="text-neutral-400 mt-5 leading-relaxed">
-              Formado entre Venezuela y las Islas Canarias, mi obsesión es que salgas por la puerta con un corte que te haga sentir tú al 200%. Trabajo por cita para respetar tu tiempo — nada de esperas.
+            <h2 className="font-display text-5xl md:text-6xl tracking-tight italic leading-[1.05]">Manos de tijera,<br />cabeza de estilo.</h2>
+            <p className="text-neutral-400 mt-6 leading-relaxed">
+              Soy <span className="text-[#D4B77A]">Heber</span>. Formado entre Venezuela y las Islas Canarias, mi obsesión es que salgas por la puerta con un corte que te haga sentir tú al 200%. Trabajo por cita para respetar tu tiempo — nada de esperas.
             </p>
             <ul className="mt-6 space-y-2 text-sm text-neutral-300">
               <li>· Corte a tijera y máquina · Barba con navaja</li>
@@ -159,7 +159,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="mb-14 max-w-2xl">
             <p className="tracking-overline uppercase text-xs text-[#D4B77A] mb-4">Opiniones</p>
-            <h2 className="font-display text-4xl md:text-5xl tracking-tight">Lo que dicen los que ya pasaron.</h2>
+            <h2 className="font-display text-5xl md:text-6xl tracking-tight italic leading-[1.05]">Lo que dicen los<br />que ya pasaron.</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {TESTIMONIALS.map((t, i) => (
@@ -182,17 +182,28 @@ export default function Home() {
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 items-center">
           <div>
             <p className="tracking-overline uppercase text-xs text-[#D4B77A] mb-4">Ubicación</p>
-            <h2 className="font-display text-4xl md:text-5xl tracking-tight">Fácil de encontrar. Difícil de olvidar.</h2>
+            <h2 className="font-display text-5xl md:text-6xl tracking-tight italic leading-[1.05]">Fácil de encontrar.<br />Difícil de olvidar.</h2>
             <div className="mt-8 space-y-4 text-neutral-300">
               <p className="flex gap-3"><MapPin className="h-5 w-5 text-[#D4B77A] mt-0.5" /> {business.address}</p>
               <p className="flex gap-3"><Phone className="h-5 w-5 text-[#D4B77A]" /> {business.phone}</p>
-              <p className="flex gap-3"><Instagram className="h-5 w-5 text-[#D4B77A]" /> @{business.instagram}</p>
+              {business.reviews_url && (
+                <a href={business.reviews_url} target="_blank" rel="noreferrer" className="flex gap-3 items-center hover:text-[#D4B77A]" data-testid="reviews-link">
+                  <Star className="h-5 w-5 text-[#D4B77A] fill-[#D4B77A]" /> Déjanos tu reseña en Google
+                </a>
+              )}
             </div>
-            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address || "Tenerife")}`} target="_blank" rel="noreferrer" className="inline-block mt-8" data-testid="open-maps-link">
-              <Button className="bg-transparent border border-[#D4B77A]/40 text-[#D4B77A] hover:bg-[#D4B77A] hover:text-[#14141A]">Abrir en Google Maps</Button>
-            </a>
+            <div className="mt-8 flex gap-3 flex-wrap">
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address || "Tenerife")}`} target="_blank" rel="noreferrer" data-testid="open-maps-link">
+                <Button className="bg-transparent border border-[#D4B77A]/40 text-[#D4B77A] hover:bg-[#D4B77A] hover:text-[#14141A]">Abrir en Google Maps</Button>
+              </a>
+              {business.reviews_url && (
+                <a href={business.reviews_url} target="_blank" rel="noreferrer" data-testid="reviews-btn">
+                  <Button className="bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold"><Star className="h-4 w-4 mr-1 fill-[#14141A]" />Escribir reseña</Button>
+                </a>
+              )}
+            </div>
           </div>
-          <div className="rounded-lg overflow-hidden border border-[#2A2A32] h-[400px]">
+          <div className="rounded-lg overflow-hidden border border-[#2A2A32] h-[420px]">
             <iframe
               title="Mapa Tenerife"
               src={`https://www.google.com/maps?q=${encodeURIComponent(business.address || "Tenerife, España")}&output=embed`}
