@@ -169,7 +169,8 @@ function AgendaPanel() {
                         <button onClick={() => cancel(a.id)} className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400" data-testid={`cancel-${a.id}`}><X className="h-3 w-3" /></button>
                       </div>
                       <p className="text-neutral-200 font-medium">{a.client_name}</p>
-                      <p className="text-neutral-500">{a.service_name} · {a.price_eur}€</p>
+                      {a.booker_name && <p className="text-[10px] text-neutral-500 italic">reservado por {a.booker_name}</p>}
+                      <p className="text-neutral-500">{a.service_name}</p>
                       <a href={`tel:${a.client_phone}`} className="text-neutral-500 hover:text-[#D4B77A] flex items-center gap-1 mt-1"><Phone className="h-3 w-3" />{a.client_phone}</a>
                     </div>
                   ))}

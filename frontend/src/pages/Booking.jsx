@@ -27,7 +27,7 @@ export default function Booking() {
   const [slots, setSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [time, setTime] = useState("");
-  const [form, setForm] = useState({ name: "", nickname: "", phone: "", policy: false });
+  const [form, setForm] = useState({ name: "", nickname: "", phone: "", forOther: false, otherName: "", policy: false });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null); // appointment
 
@@ -62,18 +62,23 @@ export default function Booking() {
 
   const submit = async () => {
     if (!form.name.trim() || !form.phone.trim()) return toast.error("Rellena tu nombre y teléfono");
+    if (form.forOther && !form.otherName.trim()) return toast.error("Escribe el nombre de la persona que viene");
     if (!form.policy) return toast.error("Debes aceptar la política del 50%");
     setSubmitting(true);
     try {
-      const { data } = await api.post("/appointments", {
+      const bookerName = form.name.trim();
+      const guestName = form.otherName.trim();
+      const payload = {
         service_id: serviceId,
         date: format(date, "yyyy-MM-dd"),
         start: time,
-        client_name: form.name.trim(),
+        client_name: form.forOther ? guestName : bookerName,
         client_nickname: form.nickname.trim(),
         client_phone: form.phone.trim(),
+        booker_name: form.forOther ? bookerName : "",
         accepted_policy: true,
-      });
+      };
+      const { data } = await api.post("/appointments", payload);
       setDone(data);
       toast.success("¡Cita confirmada!");
     } catch (e) {
@@ -209,23 +214,34 @@ export default function Booking() {
               </CardContent>
             </Card>
             <div>
-              <Label className="text-xs tracking-overline uppercase text-neutral-500">Nombre y apellidos</Label>
+              <Label className="text-xs tracking-overline uppercase text-neutral-500">Tu nombre</Label>
               <Input data-testid="input-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="Juan Pérez" />
+            </div>
+            <div>
+              <Label className="text-xs tracking-overline uppercase text-neutral-500">Tu teléfono</Label>
+              <Input data-testid="input-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="+34 600 00 00 00" />
             </div>
             <div>
               <Label className="text-xs tracking-overline uppercase text-neutral-500">Apodo (opcional)</Label>
               <Input data-testid="input-nickname" value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="Juanito" />
             </div>
-            <div>
-              <Label className="text-xs tracking-overline uppercase text-neutral-500">Teléfono</Label>
-              <Input data-testid="input-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="+34 600 00 00 00" />
-            </div>
+            <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="forother-wrap">
+              <Checkbox data-testid="input-forother" checked={form.forOther} onCheckedChange={(v) => setForm({ ...form, forOther: !!v })} className="mt-0.5 border-[#D4B77A] data-[state=checked]:bg-[#D4B77A] data-[state=checked]:text-[#14141A]" />
+              <span className="text-sm text-neutral-300 leading-relaxed">La cita es para <strong className="text-[#D4B77A]">otra persona</strong> (ej: mi hijo, un amigo)</span>
+            </label>
+            {form.forOther && (
+              <div data-testid="other-name-wrap" className="fade-up">
+                <Label className="text-xs tracking-overline uppercase text-neutral-500">Nombre de quien viene</Label>
+                <Input data-testid="input-other-name" value={form.otherName} onChange={(e) => setForm({ ...form, otherName: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="Nombre y apellido" />
+              </div>
+            )}
             <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="policy-checkbox-wrap">
               <Checkbox data-testid="input-policy" checked={form.policy} onCheckedChange={(v) => setForm({ ...form, policy: !!v })} className="mt-1 border-[#D4B77A] data-[state=checked]:bg-[#D4B77A] data-[state=checked]:text-[#14141A]" />
               <span className="text-sm text-neutral-300 leading-relaxed">
                 Acepto la <strong className="text-[#D4B77A]">política del 50%</strong>: si no me presento sin avisar, el barbero podrá cobrarme el 50% del servicio en mi próxima visita o bloquear futuras reservas. Cancelaciones permitidas hasta 12h antes.
               </span>
             </label>
+            <p className="text-xs text-neutral-500 text-center">Máximo 2 citas activas por teléfono.</p>
           </div>
         )}
 

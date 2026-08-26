@@ -112,6 +112,7 @@ class AppointmentIn(BaseModel):
     client_name: str
     client_nickname: Optional[str] = ""
     client_phone: str
+    booker_name: Optional[str] = ""  # nombre de quien reserva, si es para otra persona
     accepted_policy: bool
 
 class AppointmentOut(BaseModel):
@@ -126,6 +127,7 @@ class AppointmentOut(BaseModel):
     client_name: str
     client_nickname: Optional[str] = ""
     client_phone: str
+    booker_name: Optional[str] = ""
     status: str
     created_at: str
 
@@ -294,6 +296,8 @@ async def availability(service_id: str, date: str):
 
 
 # --- Appointments ---
+MAX_ACTIVE_APPTS_PER_PHONE = 2
+
 @api.post("/appointments", response_model=AppointmentOut)
 async def create_appointment(body: AppointmentIn):
     if not body.accepted_policy:
@@ -301,6 +305,19 @@ async def create_appointment(body: AppointmentIn):
     svc = await db.services.find_one({"id": body.service_id}, {"_id": 0})
     if not svc:
         raise HTTPException(404, "Servicio no encontrado")
+
+    # Limit: max 2 active future appointments per phone
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    active_count = await db.appointments.count_documents({
+        "client_phone": body.client_phone,
+        "status": {"$ne": "cancelled"},
+        "date": {"$gte": today_str},
+    })
+    if active_count >= MAX_ACTIVE_APPTS_PER_PHONE:
+        raise HTTPException(
+            409,
+            f"Ya tienes {MAX_ACTIVE_APPTS_PER_PHONE} citas activas con este teléfono. Cancela una para poder reservar otra.",
+        )
 
     # Re-check availability atomically-ish
     slots = await _compute_slots(body.date, svc["duration_min"])
@@ -310,12 +327,13 @@ async def create_appointment(body: AppointmentIn):
     start_m = parse_hhmm(body.start)
     end_m = start_m + svc["duration_min"]
 
-    # Upsert client
+    # Upsert client (identify by booker phone; name = booker_name if provided else client_name)
+    identity_name = (body.booker_name or "").strip() or body.client_name
     client_doc = await db.clients.find_one({"phone": body.client_phone}, {"_id": 0})
     if not client_doc:
         client_doc = {
             "id": new_id(),
-            "name": body.client_name,
+            "name": identity_name,
             "nickname": body.client_nickname or "",
             "phone": body.client_phone,
             "created_at": now_iso(),
@@ -335,6 +353,7 @@ async def create_appointment(body: AppointmentIn):
         "client_name": body.client_name,
         "client_nickname": body.client_nickname or "",
         "client_phone": body.client_phone,
+        "booker_name": (body.booker_name or "").strip(),
         "status": "confirmed",
         "created_at": now_iso(),
     }
