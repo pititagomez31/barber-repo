@@ -146,15 +146,15 @@ export default function Booking() {
 
         {/* Step content */}
         {step === 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3" data-testid="step-services">
+          <div className="grid grid-cols-3 gap-2 md:gap-3" data-testid="step-services">
             {services.map((s) => (
               <button key={s.id} onClick={() => setServiceId(s.id)} data-testid={`pick-service-${s.id}`}
-                className={`text-center p-4 md:p-6 rounded-lg border transition-colors flex flex-col items-center h-full ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/5" : "border-[#2A2A32] bg-[#1A1A1E] hover:border-[#D4B77A]/40 active:border-[#D4B77A]/40"}`}>
-                <div className={`h-10 w-10 md:h-12 md:w-12 rounded-full border grid place-items-center mb-2 md:mb-3 ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/10" : "border-[#D4B77A]/30"}`}>
+                className={`text-center p-3 md:p-6 rounded-lg border transition-colors flex flex-col items-center h-full ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/5" : "border-[#2A2A32] bg-[#1A1A1E] hover:border-[#D4B77A]/40 active:border-[#D4B77A]/40"}`}>
+                <div className={`h-9 w-9 md:h-12 md:w-12 rounded-full border grid place-items-center mb-2 md:mb-3 ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/10" : "border-[#D4B77A]/30"}`}>
                   <Scissors className="h-4 w-4 md:h-5 md:w-5 text-[#D4B77A]" />
                 </div>
-                <p className="font-display italic text-base md:text-xl leading-tight min-h-[2.5rem] md:min-h-[3rem] flex items-center">{s.name}</p>
-                <p className="text-[11px] md:text-xs text-neutral-500 mt-1.5 md:mt-2 flex items-center gap-1"><Clock className="h-3 w-3" /> {s.duration_min} min</p>
+                <p className="font-display italic text-sm md:text-xl leading-tight min-h-[2.25rem] md:min-h-[3rem] flex items-center">{s.name}</p>
+                <p className="text-[10px] md:text-xs text-neutral-500 mt-1 md:mt-2 flex items-center gap-1"><Clock className="h-2.5 w-2.5 md:h-3 md:w-3" /> {s.duration_min} min</p>
               </button>
             ))}
           </div>

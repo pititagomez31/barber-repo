@@ -80,19 +80,19 @@ export default function Home() {
             <h2 className="font-display text-4xl md:text-6xl tracking-tight italic leading-[1.05]">Elige lo que<br />necesitas hoy.</h2>
             <p className="text-neutral-400 mt-4 text-sm md:text-base leading-relaxed">Duración honesta, sin sorpresas. Reserva la que necesites.</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-5">
+          <div className="grid grid-cols-3 gap-2.5 md:gap-5">
             {services.map((s, i) => (
               <Card key={s.id} data-testid={`service-card-${i}`} className="bg-[#1A1A1E] border border-[#2A2A32] hover-lift hover:border-[#D4B77A]/40 group">
-                <CardContent className="p-6 md:p-8 flex flex-col items-center text-center h-full">
-                  <div className="h-12 w-12 md:h-14 md:w-14 rounded-full border border-[#D4B77A]/30 grid place-items-center mb-4 md:mb-5 group-hover:border-[#D4B77A] transition-colors">
-                    <Scissors className="h-5 w-5 md:h-6 md:w-6 text-[#D4B77A]" />
+                <CardContent className="p-3 md:p-8 flex flex-col items-center text-center h-full">
+                  <div className="h-9 w-9 md:h-14 md:w-14 rounded-full border border-[#D4B77A]/30 grid place-items-center mb-2 md:mb-5 group-hover:border-[#D4B77A] transition-colors">
+                    <Scissors className="h-4 w-4 md:h-6 md:w-6 text-[#D4B77A]" />
                   </div>
-                  <h3 className="font-display italic text-2xl md:text-3xl tracking-tight leading-tight min-h-[3rem] md:min-h-[3.75rem] flex items-center" data-testid={`service-name-${i}`}>{s.name}</h3>
-                  <p className="text-xs text-neutral-500 tracking-overline uppercase mt-2 md:mt-3 flex items-center gap-1.5">
-                    <Clock className="h-3 w-3" /> {s.duration_min} min
+                  <h3 className="font-display italic text-sm sm:text-base md:text-3xl tracking-tight leading-tight min-h-[2.5rem] md:min-h-[3.75rem] flex items-center" data-testid={`service-name-${i}`}>{s.name}</h3>
+                  <p className="text-[10px] md:text-xs text-neutral-500 tracking-overline uppercase mt-1.5 md:mt-3 flex items-center gap-1">
+                    <Clock className="h-2.5 w-2.5 md:h-3 md:w-3" /> {s.duration_min} min
                   </p>
-                  <Link to={`/reservar?service=${s.id}`} className="mt-5 md:mt-6 w-full mt-auto">
-                    <Button data-testid={`service-book-${i}`} className="w-full h-11 bg-transparent border border-[#D4B77A]/40 text-[#D4B77A] hover:bg-[#D4B77A] hover:text-[#14141A]">
+                  <Link to={`/reservar?service=${s.id}`} className="mt-3 md:mt-6 w-full mt-auto">
+                    <Button data-testid={`service-book-${i}`} className="w-full h-8 md:h-11 px-2 text-[11px] md:text-sm bg-transparent border border-[#D4B77A]/40 text-[#D4B77A] hover:bg-[#D4B77A] hover:text-[#14141A]">
                       Reservar
                     </Button>
                   </Link>
