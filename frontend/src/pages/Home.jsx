@@ -78,24 +78,22 @@ export default function Home() {
           <div className="max-w-2xl mb-14">
             <p className="tracking-overline uppercase text-xs text-[#D4B77A] mb-4">Servicios</p>
             <h2 className="font-display text-5xl md:text-6xl tracking-tight italic leading-[1.05]">Elige lo que<br />necesitas hoy.</h2>
-            <p className="text-neutral-400 mt-4 leading-relaxed">Precios claros, duración honesta, sin sorpresas.</p>
+            <p className="text-neutral-400 mt-4 leading-relaxed">Duración honesta, sin sorpresas. Reserva la que necesites.</p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {services.map((s, i) => (
-              <Card key={s.id} data-testid={`service-card-${i}`} className="bg-[#1A1A1E] border border-[#2A2A32] hover-lift hover:border-[#D4B77A]/40">
-                <CardContent className="p-7">
-                  <div className="flex items-start justify-between mb-4">
+              <Card key={s.id} data-testid={`service-card-${i}`} className="bg-[#1A1A1E] border border-[#2A2A32] hover-lift hover:border-[#D4B77A]/40 group">
+                <CardContent className="p-8 flex flex-col items-center text-center h-full">
+                  <div className="h-14 w-14 rounded-full border border-[#D4B77A]/30 grid place-items-center mb-5 group-hover:border-[#D4B77A] transition-colors">
                     <Scissors className="h-6 w-6 text-[#D4B77A]" />
-                    <div className="text-right">
-                      <div className="font-display text-3xl">{s.price_eur.toFixed(0)}€</div>
-                      <div className="text-xs text-neutral-500 tracking-overline uppercase mt-1">{s.duration_min} min</div>
-                    </div>
                   </div>
-                  <h3 className="font-display text-2xl tracking-tight" data-testid={`service-name-${i}`}>{s.name}</h3>
-                  <p className="text-neutral-400 text-sm mt-2 leading-relaxed">{s.description}</p>
-                  <Link to={`/reservar?service=${s.id}`}>
-                    <Button data-testid={`service-book-${i}`} className="mt-5 w-full bg-transparent border border-[#D4B77A]/40 text-[#D4B77A] hover:bg-[#D4B77A] hover:text-[#14141A]">
-                      Reservar este servicio
+                  <h3 className="font-display italic text-3xl tracking-tight leading-tight min-h-[3.75rem] flex items-center" data-testid={`service-name-${i}`}>{s.name}</h3>
+                  <p className="text-xs text-neutral-500 tracking-overline uppercase mt-3 flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> {s.duration_min} min
+                  </p>
+                  <Link to={`/reservar?service=${s.id}`} className="mt-6 w-full mt-auto">
+                    <Button data-testid={`service-book-${i}`} className="w-full bg-transparent border border-[#D4B77A]/40 text-[#D4B77A] hover:bg-[#D4B77A] hover:text-[#14141A]">
+                      Reservar
                     </Button>
                   </Link>
                 </CardContent>

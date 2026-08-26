@@ -150,12 +150,12 @@ DEFAULT_WORKING_HOURS = {
 }
 
 DEFAULT_SERVICES = [
-    {"name": "Solo Barba", "description": "Perfilado y arreglo de barba con navaja y toalla caliente.", "price_eur": 10.0, "duration_min": 15, "active": True},
-    {"name": "Solo Corte", "description": "Corte a tijera y máquina + lavado + peinado.", "price_eur": 15.0, "duration_min": 35, "active": True},
-    {"name": "Corte + Barba", "description": "Corte completo + arreglo de barba con toalla caliente.", "price_eur": 22.0, "duration_min": 50, "active": True},
-    {"name": "Corte Niño (-12)", "description": "Corte para los peques de la casa.", "price_eur": 12.0, "duration_min": 25, "active": True},
-    {"name": "Diseño con Cuchilla", "description": "Diseño personalizado a navaja.", "price_eur": 5.0, "duration_min": 10, "active": True},
-    {"name": "Pack Premium", "description": "Corte + Barba + Mascarilla facial + Peinado.", "price_eur": 30.0, "duration_min": 60, "active": True},
+    {"name": "Solo Corte", "description": "", "price_eur": 0.0, "duration_min": 35, "active": True},
+    {"name": "Corte y Barba", "description": "", "price_eur": 0.0, "duration_min": 50, "active": True},
+    {"name": "Corte, Barba y Cejas", "description": "", "price_eur": 0.0, "duration_min": 60, "active": True},
+    {"name": "Corte y Cejas", "description": "", "price_eur": 0.0, "duration_min": 40, "active": True},
+    {"name": "Solo Arreglo de Barba", "description": "", "price_eur": 0.0, "duration_min": 15, "active": True},
+    {"name": "Perfilado de Cejas", "description": "", "price_eur": 0.0, "duration_min": 10, "active": True},
 ]
 
 

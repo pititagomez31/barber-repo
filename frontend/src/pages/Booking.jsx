@@ -85,7 +85,7 @@ export default function Booking() {
 
   if (done) {
     const waMsg = encodeURIComponent(
-      `¡Hola +58 BarberStudio! Confirmo mi cita:\n\n📅 ${done.date} a las ${done.start}\n✂️ ${done.service_name} (${done.duration_min} min · ${done.price_eur}€)\n👤 ${done.client_name}\n📞 ${done.client_phone}\n\nAcepto política del 50%. ¡Nos vemos!`
+      `¡Hola +58 BarberStudio! Confirmo mi cita:\n\n📅 ${done.date} a las ${done.start}\n✂️ ${done.service_name} (${done.duration_min} min)\n👤 ${done.client_name}\n📞 ${done.client_phone}\n\nAcepto política del 50%. ¡Nos vemos!`
     );
     const wa = `https://wa.me/${business.whatsapp}?text=${waMsg}`;
     return (
@@ -101,7 +101,7 @@ export default function Booking() {
               <p className="flex justify-between"><span className="text-neutral-500">Servicio</span><span>{done.service_name}</span></p>
               <p className="flex justify-between"><span className="text-neutral-500">Fecha</span><span>{done.date}</span></p>
               <p className="flex justify-between"><span className="text-neutral-500">Hora</span><span>{done.start} – {done.end}</span></p>
-              <p className="flex justify-between"><span className="text-neutral-500">Precio</span><span className="text-[#D4B77A] font-semibold">{done.price_eur}€</span></p>
+              <p className="flex justify-between"><span className="text-neutral-500">Duración</span><span>{done.duration_min} min</span></p>
               <p className="flex justify-between border-t border-[#2A2A32] pt-3 mt-3"><span className="text-neutral-500">Código</span><span className="font-mono text-xs">{done.id.slice(0, 8)}</span></p>
             </CardContent>
           </Card>
@@ -146,17 +146,15 @@ export default function Booking() {
 
         {/* Step content */}
         {step === 0 && (
-          <div className="grid md:grid-cols-2 gap-3" data-testid="step-services">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="step-services">
             {services.map((s) => (
               <button key={s.id} onClick={() => setServiceId(s.id)} data-testid={`pick-service-${s.id}`}
-                className={`text-left p-5 rounded-lg border transition-colors ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/5" : "border-[#2A2A32] bg-[#1A1A1E] hover:border-[#D4B77A]/40"}`}>
-                <div className="flex items-start justify-between">
+                className={`text-center p-6 rounded-lg border transition-colors flex flex-col items-center h-full ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/5" : "border-[#2A2A32] bg-[#1A1A1E] hover:border-[#D4B77A]/40"}`}>
+                <div className={`h-12 w-12 rounded-full border grid place-items-center mb-3 ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/10" : "border-[#D4B77A]/30"}`}>
                   <Scissors className="h-5 w-5 text-[#D4B77A]" />
-                  <span className="font-display text-2xl">{s.price_eur.toFixed(0)}€</span>
                 </div>
-                <p className="font-display text-lg mt-3">{s.name}</p>
-                <p className="text-xs text-neutral-500 mt-1 flex items-center gap-1"><Clock className="h-3 w-3" /> {s.duration_min} min</p>
-                <p className="text-sm text-neutral-400 mt-3">{s.description}</p>
+                <p className="font-display italic text-xl leading-tight min-h-[3rem] flex items-center">{s.name}</p>
+                <p className="text-xs text-neutral-500 mt-2 flex items-center gap-1"><Clock className="h-3 w-3" /> {s.duration_min} min</p>
               </button>
             ))}
           </div>
@@ -207,7 +205,7 @@ export default function Booking() {
                 <p className="flex justify-between"><span className="text-neutral-500">Servicio</span><span>{service?.name}</span></p>
                 <p className="flex justify-between"><span className="text-neutral-500">Fecha</span><span>{date && format(date, "d MMM yyyy", { locale: es })}</span></p>
                 <p className="flex justify-between"><span className="text-neutral-500">Hora</span><span>{time}</span></p>
-                <p className="flex justify-between"><span className="text-neutral-500">Precio</span><span className="text-[#D4B77A] font-semibold">{service?.price_eur}€</span></p>
+                <p className="flex justify-between"><span className="text-neutral-500">Duración</span><span>{service?.duration_min} min</span></p>
               </CardContent>
             </Card>
             <div>
