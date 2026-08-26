@@ -118,26 +118,26 @@ export default function Booking() {
   }
 
   return (
-    <div className="min-h-screen bg-[#14141A] text-neutral-100 noise-bg" data-testid="booking-page">
-      <div className="max-w-3xl mx-auto px-5 py-10">
-        <button onClick={() => nav(-1)} className="text-neutral-400 hover:text-[#D4B77A] flex items-center gap-1 mb-6 text-sm" data-testid="booking-back">
+    <div className="min-h-screen bg-[#14141A] text-neutral-100 noise-bg pb-8" data-testid="booking-page">
+      <div className="max-w-3xl mx-auto px-4 md:px-5 py-6 md:py-10">
+        <button onClick={() => nav(-1)} className="text-neutral-400 hover:text-[#D4B77A] flex items-center gap-1 mb-5 md:mb-6 text-sm" data-testid="booking-back">
           <ChevronLeft className="h-4 w-4" /> Volver
         </button>
 
         {/* Progress */}
-        <div className="flex items-center justify-between mb-10" data-testid="booking-progress">
+        <div className="flex items-center justify-between mb-8 md:mb-10" data-testid="booking-progress">
           {STEPS.map((label, i) => (
             <div key={label} className="flex-1 flex items-center">
               <div className={`h-8 w-8 shrink-0 rounded-full grid place-items-center text-xs font-semibold border ${i <= step ? "bg-[#D4B77A] text-[#14141A] border-[#D4B77A]" : "bg-transparent text-neutral-500 border-[#2A2A32]"}`}>{i + 1}</div>
               <div className="ml-2 hidden sm:block text-xs">
                 <p className={`tracking-overline uppercase ${i <= step ? "text-[#D4B77A]" : "text-neutral-500"}`}>{label}</p>
               </div>
-              {i < STEPS.length - 1 && <div className={`flex-1 h-px mx-3 ${i < step ? "bg-[#D4B77A]" : "bg-[#2A2A32]"}`} />}
+              {i < STEPS.length - 1 && <div className={`flex-1 h-px mx-2 md:mx-3 ${i < step ? "bg-[#D4B77A]" : "bg-[#2A2A32]"}`} />}
             </div>
           ))}
         </div>
 
-        <h1 className="font-display text-3xl md:text-4xl tracking-tight mb-8" data-testid="booking-step-title">
+        <h1 className="font-display text-3xl md:text-4xl tracking-tight italic mb-6 md:mb-8" data-testid="booking-step-title">
           {step === 0 && "Elige tu servicio"}
           {step === 1 && "Elige el día"}
           {step === 2 && "Elige la hora"}
@@ -146,15 +146,15 @@ export default function Booking() {
 
         {/* Step content */}
         {step === 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" data-testid="step-services">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3" data-testid="step-services">
             {services.map((s) => (
               <button key={s.id} onClick={() => setServiceId(s.id)} data-testid={`pick-service-${s.id}`}
-                className={`text-center p-6 rounded-lg border transition-colors flex flex-col items-center h-full ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/5" : "border-[#2A2A32] bg-[#1A1A1E] hover:border-[#D4B77A]/40"}`}>
-                <div className={`h-12 w-12 rounded-full border grid place-items-center mb-3 ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/10" : "border-[#D4B77A]/30"}`}>
-                  <Scissors className="h-5 w-5 text-[#D4B77A]" />
+                className={`text-center p-4 md:p-6 rounded-lg border transition-colors flex flex-col items-center h-full ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/5" : "border-[#2A2A32] bg-[#1A1A1E] hover:border-[#D4B77A]/40 active:border-[#D4B77A]/40"}`}>
+                <div className={`h-10 w-10 md:h-12 md:w-12 rounded-full border grid place-items-center mb-2 md:mb-3 ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/10" : "border-[#D4B77A]/30"}`}>
+                  <Scissors className="h-4 w-4 md:h-5 md:w-5 text-[#D4B77A]" />
                 </div>
-                <p className="font-display italic text-xl leading-tight min-h-[3rem] flex items-center">{s.name}</p>
-                <p className="text-xs text-neutral-500 mt-2 flex items-center gap-1"><Clock className="h-3 w-3" /> {s.duration_min} min</p>
+                <p className="font-display italic text-base md:text-xl leading-tight min-h-[2.5rem] md:min-h-[3rem] flex items-center">{s.name}</p>
+                <p className="text-[11px] md:text-xs text-neutral-500 mt-1.5 md:mt-2 flex items-center gap-1"><Clock className="h-3 w-3" /> {s.duration_min} min</p>
               </button>
             ))}
           </div>
@@ -189,7 +189,7 @@ export default function Booking() {
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                 {slots.map((t) => (
                   <button key={t} onClick={() => setTime(t)} data-testid={`pick-time-${t}`}
-                    className={`py-3 rounded-md border text-sm font-medium transition-colors ${time === t ? "bg-[#D4B77A] text-[#14141A] border-[#D4B77A]" : "bg-[#1A1A1E] border-[#2A2A32] hover:border-[#D4B77A]/50"}`}>
+                    className={`py-3.5 md:py-3 rounded-md border text-sm font-medium transition-colors ${time === t ? "bg-[#D4B77A] text-[#14141A] border-[#D4B77A]" : "bg-[#1A1A1E] border-[#2A2A32] hover:border-[#D4B77A]/50 active:border-[#D4B77A]/50"}`}>
                     {t}
                   </button>
                 ))}
