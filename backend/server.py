@@ -9,7 +9,7 @@ import uuid
 import logging
 import bcrypt
 import jwt
-from datetime import datetime, timezone, timedelta, date, time as dtime
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials

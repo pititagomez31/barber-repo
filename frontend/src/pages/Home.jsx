@@ -80,7 +80,7 @@ export default function Home() {
             <h2 className="font-display text-5xl md:text-6xl tracking-tight italic leading-[1.05]">Elige lo que<br />necesitas hoy.</h2>
             <p className="text-neutral-400 mt-4 leading-relaxed">Duración honesta, sin sorpresas. Reserva la que necesites.</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
             {services.map((s, i) => (
               <Card key={s.id} data-testid={`service-card-${i}`} className="bg-[#1A1A1E] border border-[#2A2A32] hover-lift hover:border-[#D4B77A]/40 group">
                 <CardContent className="p-8 flex flex-col items-center text-center h-full">

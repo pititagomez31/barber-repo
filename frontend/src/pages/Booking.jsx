@@ -146,7 +146,7 @@ export default function Booking() {
 
         {/* Step content */}
         {step === 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="step-services">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" data-testid="step-services">
             {services.map((s) => (
               <button key={s.id} onClick={() => setServiceId(s.id)} data-testid={`pick-service-${s.id}`}
                 className={`text-center p-6 rounded-lg border transition-colors flex flex-col items-center h-full ${serviceId === s.id ? "border-[#D4B77A] bg-[#D4B77A]/5" : "border-[#2A2A32] bg-[#1A1A1E] hover:border-[#D4B77A]/40"}`}>
