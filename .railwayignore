@@ -1,0 +1,17 @@
+# Emergent
+.emergent/
+
+# Local memory & test outputs
+memory/
+tests/
+test_reports/
+test_result.md
+design_guidelines.json
+
+# Root README (not deployed)
+README.md
+
+# Build artifacts / caches
+**/__pycache__/
+**/*.pyc
+**/node_modules/
