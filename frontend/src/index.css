@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        /* Graphite + Soft Gold palette */
+        --background: 240 8% 9%;      /* #14141A */
+        --foreground: 0 0% 96%;
+        --card: 240 8% 11%;           /* #1A1A1E */
+        --card-foreground: 0 0% 96%;
+        --popover: 240 8% 11%;
+        --popover-foreground: 0 0% 96%;
+        --primary: 39 47% 66%;        /* #D4B77A gold */
+        --primary-foreground: 240 8% 9%;
+        --secondary: 240 8% 14%;
+        --secondary-foreground: 0 0% 96%;
+        --muted: 240 8% 14%;
+        --muted-foreground: 240 5% 65%;
+        --accent: 39 47% 66%;
+        --accent-foreground: 240 8% 9%;
+        --destructive: 0 62% 45%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 240 8% 18%;         /* #2A2A32 */
+        --input: 240 8% 16%;
+        --ring: 39 47% 66%;
+        --radius: 0.5rem;
+    }
+    .dark { color-scheme: dark; }
+    html { scroll-behavior: smooth; }
+    body {
+        margin: 0;
+        font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+        background-color: #14141A;
+        color: #F5F5F5;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    * { @apply border-border; }
+    ::selection { background: #D4B77A; color: #14141A; }
+    /* Imágenes de flujo nunca deformadas: ratio siempre preservado.
+       Las clases de Tailwind (h-full, h-[Npx], object-cover/contain) siguen ganando por capa. */
+    img { max-width: 100%; height: auto; }
+}
+
+@layer utilities {
+    .font-display { font-family: 'Cormorant Garamond', ui-serif, Georgia, serif; font-style: italic; font-weight: 500; letter-spacing: -0.005em; }
+    .font-body { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; }
+    .tracking-overline { letter-spacing: 0.2em; }
+
+    .noise-bg {
+        background-image:
+            radial-gradient(circle at 20% 10%, rgba(212,183,122,0.06), transparent 40%),
+            radial-gradient(circle at 80% 90%, rgba(212,183,122,0.04), transparent 40%),
+            url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.83 0 0 0 0 0.72 0 0 0 0 0.48 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    }
+    .neumo {
+        background: #1A1A1E;
+        box-shadow: 6px 6px 16px #0d0d10, -6px -6px 16px #1e1e24;
+    }
+    .neumo-inset {
+        background: #17171B;
+        box-shadow: inset 4px 4px 10px #0d0d10, inset -4px -4px 10px #1e1e24;
+    }
+    .glass {
+        background: rgba(20, 20, 26, 0.72);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+    .gold-glow {
+        box-shadow: 0 0 0 1px rgba(212,183,122,0.35), 0 12px 40px -12px rgba(212,183,122,0.35);
+    }
+    .hover-lift {
+        transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+    }
+    .hover-lift:hover { transform: translateY(-3px); }
+    .btn-shine {
+        position: relative; overflow: hidden;
+    }
+    .btn-shine::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(120deg, transparent 20%, rgba(255,255,255,0.15) 45%, transparent 60%);
+        transform: translateX(-100%);
+        transition: transform 700ms ease;
+    }
+    .btn-shine:hover::after { transform: translateX(100%); }
+    .fade-up { animation: fadeUp 700ms ease both; }
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(16px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+}

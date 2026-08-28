@@ -1,0 +1,12 @@
+**/node_modules
+**/__pycache__
+**/*.pyc
+.git
+.gitignore
+build
+dist
+.env
+.env.local
+tests/
+test_reports/
+.emergent/

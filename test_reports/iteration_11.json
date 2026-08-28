@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 11: full verification of the 5-change frontend batch (+58 BarberStudio) plus regression. Backend: 12/12 pytest pass on the public preview URL (/api/business new address, admin JWT login + /auth/me, 401/403 on protected routes, /api/services seed, /api/working-hours, availability 404 for bad service, booking e2e with GET persistence, anti double-booking 409, policy 400, 2-active-appointments-per-phone limit). Frontend: Home has NO #opiniones section, no testimonial-* testids, no 'opiniones/testimonio' text, no nav-opiniones (desktop + mobile menu), zero a[href^=tel:] and no float-phone anywhere (Home, /reservar, /admin/login, /admin); float-whatsapp visible with no gap left by the removed buttons. New address renders in #ubicacion, footer, google-map iframe src and open-maps-link. Images: hero/gallery use object-cover, #sobre uses object-contain inside aspect-[4/5]; no horizontal overflow at 1920/1024/768/390/360. Booking 4-step flow e2e on mobile viewport created a real appointment (2026-08-29 10:00, code b80547f3) and showed booking-success. Found and fixed a CRASH in AdminDashboard (useEffect(load) returning a Promise -> 'destroy is not a function' ErrorBoundary when leaving the Bloqueos tab). All 5 admin tabs now switch repeatedly with zero JS errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminDashboard (BlockersPanel/AgendaPanel)", "issue": "FIXED BY TESTER: `useEffect(load, [])` where load returned a Promise made React use the Promise as the cleanup function -> runtime crash 'destroy is not a function' and full ErrorBoundary screen ('Algo se ha torcido') as soon as the user left the Bloqueos tab (e.g. Bloqueos -> Clientes). Wrapped in `useEffect(() => { load(); }, [])` and added Array.isArray guard + toast catch. Please keep this pattern (never pass an async/promise-returning fn directly to useEffect).", "selector": "[data-testid=\"error-boundary\"]", "priority": "CRITICAL (fixed, needs review/keep)"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home gallery (#galeria) at <768px (tested 390x800 and 360x800)", "issues": ["Bento grid layout collapses: container is h-[500px] with grid-rows-3 but item layout needs 4 rows on mobile (col-span-2 row-span-2 + col-span-2 + 2 x col-span-1), so an implicit 4th row appears. Measured rows: 34.8px/34.8px/34.8px/359.6px -> gallery-item-0 renders 350x82 and gallery-item-1 350x35 (thin cropped slivers) while gallery-item-2/3 render 169x360. Images are not stretched (object-cover) but the featured photos are practically invisible on mobile. Suggest a mobile-specific grid (e.g. grid-cols-2 auto-rows-[160px] with row-span only from md:)."]},
+      {"screen": "Admin > Bloqueos", "issues": ["Uses native browser date picker (<input type=\"date\"> at data-testid=blk-date) instead of the shadcn Calendar used in the public booking flow - inconsistent look with the graphite+gold theme."]},
+      {"screen": "Booking step 2 calendar", "issues": ["Sundays (closed day per working-hours weekday 6) are selectable; selecting them just yields 'no-slots'. Minor UX: disable closed weekdays in the calendar."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter11_batch.py",
+    "/app/backend/tests/cleanup_iter11.py",
+    "/app/test_reports/pytest/iter11.xml"
+  ],
+  "action_items": [
+    "Review/keep the AdminDashboard useEffect fix (already applied by tester) - it was a hard crash of the admin panel.",
+    "Fix the mobile bento gallery row collapse (<768px): featured images render only 82px/35px tall.",
+    "Optional: replace native date input in Admin>Bloqueos with shadcn Calendar; disable closed weekdays in booking calendar."
+  ],
+  "critical_code_review_comments": [
+    "AdminDashboard.jsx: no `useEffect(promiseReturningFn)` anywhere else now (grep clean). Keep eslint react-hooks rules on to catch this class of bug.",
+    "Home.jsx / Footer.jsx render `business.address` with no fallback while /api/business loads - momentarily empty text; acceptable but a skeleton would be cleaner.",
+    "FloatingContact builds https://wa.me/ with an empty whatsapp number when BUSINESS_WHATSAPP is unset; link goes to wa.me/?text=... Consider hiding the button when the number is empty (preview only, not a prod bug).",
+    "All backend responses correctly project out _id; no ObjectId leaks observed."
+  ],
+  "updated_files": ["/app/frontend/src/pages/AdminDashboard.jsx", "/app/backend/tests/test_iter11_batch.py", "/app/backend/tests/cleanup_iter11.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "~95% (all batch requirements pass; 1 crash fixed, 1 mobile gallery layout defect open)"},
+  "seed_data_creation": "Created and then cancelled TEST_ appointments via API + one UI appointment (TEST QA UI, 2026-08-29 10:00) - cleaned up with /app/backend/tests/cleanup_iter11.py.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "admin pititagomez31@gmail.com / 58Barber2025! - works, JWT stored in localStorage key '58barber_token'",
+  "context_for_next_testing_agent": "Backend regression suite: /app/backend/tests/test_iter11_batch.py (12 tests, all green). Preview date is 2026-08-28; booking calendar only enables the current + next few days, and today's slots may be empty after closing time - iterate over enabled day buttons ([data-testid=\"step-date\"] button:not([disabled])) until availability returns slots. Shadcn day buttons have class rdp-button_reset (not rdp-day), so filter nav arrows by has_not svg. Remaining open issue: mobile (<768px) gallery bento row collapse in Home.jsx.",
+  "rca_of_the_issue": "Admin panel crash RCA: BlockersPanel had `const load = () => api.get('/blockers').then(...)` (implicit arrow return = Promise) passed directly as the effect callback: `useEffect(load, [])`. React stores the return value as the destructor and calls it on unmount -> 'destroy is not a function' -> ErrorBoundary. Reproduced by logging in and clicking Bloqueos then Clientes. Fixed by wrapping the call in a void arrow function; verified by 7 consecutive tab switches with 0 JS errors."
+}

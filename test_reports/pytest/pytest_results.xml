@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="7" time="1.954" timestamp="2026-08-27T23:08:33.106887+00:00" hostname="agent-env-fa4bbced-dfa4-4812-a902-b04550a31392"><testcase classname="tests.test_smoke_iter8" name="test_requirements_txt_trimmed" time="0.546" /><testcase classname="tests.test_smoke_iter8" name="test_business_endpoint" time="0.084" /><testcase classname="tests.test_smoke_iter8" name="test_services_count_and_content" time="0.082"><failure message="AssertionError: service mismatch. got={('Perfilado de Cejas', 10), ('Solo Corte', 35), ('Solo Arreglo de Barba', 15), ('Corte, Barba y Cejas', 60), ('Corte y Barba', 50), ('Corte y Cejas', 40)}&#10;assert {('Corte y Ba...o Corte', 35)} == {('Corte Barb...o Corte', 35)}&#10;  &#10;  Extra items in the left set:&#10;  ('Corte, Barba y Cejas', 60)&#10;  Extra items in the right set:&#10;  ('Corte Barba y Cejas', 60)&#10;  &#10;  Full diff:...&#10;  &#10;  ...Full output truncated (30 lines hidden), use '-vv' to show">backend/tests/test_smoke_iter8.py:71: in test_services_count_and_content
+    assert got == EXPECTED_SERVICES, f"service mismatch. got={got}"
+E   AssertionError: service mismatch. got={('Perfilado de Cejas', 10), ('Solo Corte', 35), ('Solo Arreglo de Barba', 15), ('Corte, Barba y Cejas', 60), ('Corte y Barba', 50), ('Corte y Cejas', 40)}
+E   assert {('Corte y Ba...o Corte', 35)} == {('Corte Barb...o Corte', 35)}
+E     
+E     Extra items in the left set:
+E     ('Corte, Barba y Cejas', 60)
+E     Extra items in the right set:
+E     ('Corte Barba y Cejas', 60)
+E     
+E     Full diff:...
+E     
+E     ...Full output truncated (30 lines hidden), use '-vv' to show</failure></testcase><testcase classname="tests.test_smoke_iter8" name="test_auth_login" time="0.000" /><testcase classname="tests.test_smoke_iter8" name="test_auth_me" time="0.089" /><testcase classname="tests.test_smoke_iter8" name="test_availability_returns_slots" time="0.172" /><testcase classname="tests.test_smoke_iter8" name="test_appointment_create_and_slot_removed" time="0.386" /></testsuite></testsuites>

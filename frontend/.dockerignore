@@ -1,0 +1,10 @@
+node_modules
+build
+.git
+.gitignore
+.env
+.env.local
+.env.development
+tests/
+test_reports/
+.emergent/
