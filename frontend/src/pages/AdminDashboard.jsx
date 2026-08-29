@@ -44,7 +44,8 @@ export default function AdminDashboard() {
 
       <main className="max-w-7xl mx-auto px-5 py-8">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="bg-[#1A1A1E] border border-[#2A2A32] p-1 h-auto">
+          <div className="overflow-x-auto -mx-5 px-5 pb-1">
+            <TabsList className="bg-[#1A1A1E] border border-[#2A2A32] p-1 h-auto w-max min-w-full">
             <TabsTrigger data-testid="tab-agenda" value="agenda" className="data-[state=active]:bg-[#D4B77A] data-[state=active]:text-[#14141A] px-4 py-2">
               <CalIcon className="h-4 w-4 mr-2" /> Agenda
             </TabsTrigger>
@@ -60,7 +61,8 @@ export default function AdminDashboard() {
             <TabsTrigger data-testid="tab-clients" value="clients" className="data-[state=active]:bg-[#D4B77A] data-[state=active]:text-[#14141A] px-4 py-2">
               <Users className="h-4 w-4 mr-2" /> Clientes
             </TabsTrigger>
-          </TabsList>
+            </TabsList>
+          </div>
 
           <TabsContent value="agenda" className="mt-6"><AgendaPanel /></TabsContent>
           <TabsContent value="services" className="mt-6"><ServicesPanel /></TabsContent>

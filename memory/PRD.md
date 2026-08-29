@@ -24,6 +24,10 @@ App web existente (React + FastAPI + MongoDB, deploy en Railway: https://barber-
 - Botón flotante WhatsApp ahora se oculta si BUSINESS_WHATSAPP está vacío.
 - Testing: backend 12/12 pytest, frontend verificado en 360/390/768/1024/1920px, reserva e2e OK. Reporte: /app/test_reports/iteration_11.json.
 
+## Bug fix (2026-08-29)
+- Crash producción móvil "removeChild on Node" (ErrorBoundary "Algo se ha torcido") en admin y flujo de reserva: causa raíz = `<html lang="en">` con contenido ES → Chrome móvil auto-traducía y Google Translate envolvía text nodes en `<font>`, rompiendo el DOM de React 19. Fix en frontend/public/index.html: `lang="es" class="notranslate"` + `<meta name="google" content="notranslate">` + title propio. Verificado por testing agent (iteration_12): 0 ErrorBoundary, 0 errores JS en Home/reserva e2e/admin (15 cambios de pestaña, 390px).
+- Fix adicional: overflow horizontal del TabsList del admin en móvil (scrollWidth 576→390) envolviéndolo en div con overflow-x-auto. Auto-verificado con screenshot 390px.
+
 ## Backlog priorizado
 - P0: Usuario debe actualizar BUSINESS_ADDRESS en Railway (backend) y hacer redeploy del frontend con Clear build cache tras Save to GitHub.
 - P0 (seguridad, aplazado por el usuario): repo público con credenciales en historial — poner privado y rotar Mongo password, ADMIN_PASSWORD, JWT_SECRET.

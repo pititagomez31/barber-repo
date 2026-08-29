@@ -1,0 +1,22 @@
+{
+  "summary": "Regresión enfocada del bug removeChild/ErrorBoundary en viewport móvil (390x800) sobre la URL de preview. Verificado HTML servido (lang=es, class=notranslate, meta google=notranslate), Home móvil, flujo completo de reserva end-to-end (cita real creada: TEST QA Movil / +34 610383295 / 2026-08-29 17:00, código 5797f0a8) y panel admin con login real + 3 ciclos completos por las 5 pestañas. CERO apariciones de data-testid='error-boundary', CERO pageerrors y CERO errores de consola (ni removeChild ni 'destroy is not a function'). Único defecto encontrado: overflow horizontal del documento en el panel admin móvil (scrollWidth 576 vs viewport 390) causado por TabsList sin contenedor scrollable, lo que desplaza y recorta el contenido (visible sobre todo en la pestaña Clientes).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminDashboard TabsList", "issue": "En móvil (390px) las 5 TabsTrigger no caben y no hay contenedor con overflow-x-auto: el documento entero se vuelve scrollable horizontalmente (document.scrollWidth=576 vs clientWidth=390). Al pulsar Bloqueos/Clientes el navegador desplaza toda la página (scrollLeft 72/181) y las tarjetas de contenido quedan cortadas fuera de pantalla. Sugerencia: envolver TabsList en div con overflow-x-auto (scrollbar oculta) y/o usar grid de 2 filas en mobile.", "selector": "[data-testid=\"tab-clients\"] / TabsList (AdminDashboard.jsx:47)", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": ["Corregir el overflow horizontal del TabsList del panel admin en móvil (wrap con overflow-x-auto) para que el contenido no se desplace/recorte al cambiar de pestaña"],
+  "critical_code_review_comments": ["Fix de index.html correcto y verificado en el HTML servido (lang=\"es\", class=\"notranslate\", meta google=notranslate); no hay forma de emular la auto-traducción de Chrome en Playwright, pero la protección declarativa está aplicada correctamente"],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (no solicitado)", "frontend": "100% de flujos funcionales OK; 1 defecto visual de layout móvil"},
+  "seed_data_creation": "Cita creada en la reserva móvil: TEST QA Movil, teléfono +34 610383295, 2026-08-29 17:00-17:35 (Solo Corte)",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin pititagomez31@gmail.com / 58Barber2025! (login OK)",
+  "context_for_next_testing_agent": "Bug removeChild/ErrorBoundary no reproducible: 0 ErrorBoundary y 0 errores JS en Home, /reservar (e2e completo) y /admin con 15 cambios de pestaña en móvil. Home móvil: sin sección Opiniones, 0 enlaces tel: (sin botón flotante de teléfono), dirección 'Avenida de Los Majuelos 51C' visible en #ubicacion y footer. Pestañas admin: agenda-grid, add-service-btn, sched-save, blk-add presentes; Clientes muestra 4 clientes. Pendiente: overflow-x del TabsList admin en móvil.",
+  "rca_of_the_issue": "El crash original provenía de Google Translate envolviendo text nodes en <font> con <html lang=en>; el fix (lang=es + notranslate + meta google=notranslate) está presente en el HTML servido por el preview, y todos los flujos móviles se ejecutan sin errores de DOM."
+}
