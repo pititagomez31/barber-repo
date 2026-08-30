@@ -36,6 +36,7 @@ App web existente (React + FastAPI + MongoDB, deploy en Railway: https://barber-
 - Pendiente usuario en Railway: BUSINESS_WHATSAPP (número del barbero), WEBHOOK_CRON_SECRET, BUSINESS_ADDRESS, y cron externo.
 - Fixes post-testing (iter13): iframe de Maps remonta con key al cargar maps_query (ya muestra Multitienda Veloz 24hr, verificado con screenshot); run_recordatorios con claim atómico find_one_and_update (doble cron simultáneo → 1 y 0 procesadas, sin emails duplicados).
 - Fix 405 (iter14): /api/cron/recordatorios ahora acepta GET y POST (api_route) porque cron-job.org llama con GET por defecto. Verificado 8/8: 401 sin/con mal Bearer en ambos métodos, 200 con Bearer correcto en ambos, e2e con email OK.
+- Fix deploy Railway: requirements.txt regenerado limpio con solo las 9 dependencias reales (fastapi, uvicorn, motor, pymongo, pydantic, python-dotenv, bcrypt, PyJWT, httpx) — pip freeze había metido emergentintegrations y litellm (privados de Emergent, no existen en PyPI) y rompía el build. Verificado con pip download contra PyPI.
 
 ## Backlog priorizado
 - P0: Usuario debe actualizar BUSINESS_ADDRESS en Railway (backend) y hacer redeploy del frontend con Clear build cache tras Save to GitHub.
