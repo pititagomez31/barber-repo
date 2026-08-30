@@ -1,8 +1,8 @@
 crons:
   - name: recordatorios-diarios
     description: "Genera recordatorios wa.me de las citas de mañana y los envía por email al cliente"
-    cron: "0 8 * * *"
-    timezone: "Europe/Madrid"
+    cron: "0 10 * * *"
+    timezone: "Atlantic/Canary"
     endpoint: "{{BASE_URL}}/api/cron/recordatorios"
     method: POST
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.

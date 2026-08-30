@@ -577,7 +577,7 @@ async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str
         return None
 
 
-# --- Recordatorios automáticos (cron diario 8:00 Europe/Madrid) ---
+# --- Recordatorios automáticos (cron diario 10:00 Atlantic/Canary) ---
 WEBHOOK_CRON_SECRET = os.environ.get("WEBHOOK_CRON_SECRET", "")
 
 async def run_recordatorios() -> int:
