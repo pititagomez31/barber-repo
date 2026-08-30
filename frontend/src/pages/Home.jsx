@@ -163,7 +163,7 @@ export default function Home() {
               )}
             </div>
             <div className="mt-6 md:mt-8 flex gap-3 flex-wrap">
-              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address || "Tenerife")}`} target="_blank" rel="noreferrer" data-testid="open-maps-link" className="flex-1 sm:flex-initial">
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.maps_query || business.address || "Tenerife")}`} target="_blank" rel="noreferrer" data-testid="open-maps-link" className="flex-1 sm:flex-initial">
                 <Button className="w-full bg-transparent border border-[#D4B77A]/40 text-[#D4B77A] hover:bg-[#D4B77A] hover:text-[#14141A]">Abrir en Maps</Button>
               </a>
               {business.reviews_url && (
@@ -175,8 +175,9 @@ export default function Home() {
           </div>
           <div className="rounded-lg overflow-hidden border border-[#2A2A32] h-[280px] md:h-[420px]">
             <iframe
+              key={business.maps_query || business.address || "loading"}
               title="Mapa Tenerife"
-              src={`https://www.google.com/maps?q=${encodeURIComponent(business.address || "Tenerife, España")}&output=embed`}
+              src={`https://www.google.com/maps?q=${encodeURIComponent(business.maps_query || business.address || "Tenerife, España")}&output=embed`}
               className="w-full h-full grayscale-[40%]"
               loading="lazy"
               data-testid="google-map"

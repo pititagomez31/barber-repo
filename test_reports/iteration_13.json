@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 13: focused testing of the WhatsApp confirmation/reminder feature (booking with email, wa.me links, admin confirmar/recordatorio, cron endpoint + e2e email) and verification of the Home #ubicacion maps_query fix. Backend: 13/13 pytest passed (new /app/backend/tests/test_iter13_whatsapp.py). Frontend: mobile booking e2e (390x844) reached success screen with correct wa.me link and no barber button; admin agenda flow (badge Pendiente -> Confirmar -> Confirmada verde, boton Confirmar desaparece, Recordatorio abre wa.me correcto via window.open intercept) all passed. One real (intermittent) UI defect found: the Google Maps iframe keeps showing the fallback 'Tenerife' map even though its src attribute is correctly updated to the maps_query.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/cron/recordatorios", "issue": "run_recordatorios is not concurrency-safe: it reads the pending list first and marks recordatorio_enviado per appointment afterwards. Two overlapping cron calls processed the same 3 appointments and sent 4 emails (logs 02:11:09 show 'Recordatorios: 3 citas procesadas' twice). Use an atomic find_one_and_update({id, recordatorio_enviado: {$ne: true}}) claim before sending."},
+      {"endpoint": "GET /api/appointments/{id}", "issue": "Public/unauthenticated and returns client_phone + client_email (PII) for any known appointment id. Pre-existing, but worth restricting or requiring phone match."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Home.jsx #ubicacion google-map iframe", "issue": "Iframe mounts before /api/business resolves with the fallback query ('Tenerife, España'); when business.maps_query arrives React updates the src attribute (verified src contains Multitienda%20Veloz%2024hr) but the already-loaded Google embed does NOT re-navigate, so the visible map shows the generic Tenerife island instead of Multitienda Veloz 24hr. Reproduced in 2 of 3 loads, still wrong after 12s. Fix: render the iframe only when business.maps_query is loaded, or add key={business.maps_query} to force a remount.", "selector": "[data-testid=\"google-map\"]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Booking step 3 (no slots day, e.g. Sunday 30/08)", "issues": ["'Siguiente' stays visually enabled with 0 slots; clicking shows toast 'Elige una hora' (acceptable, but could be disabled), and the empty state leaves a very large blank area below on mobile"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter13_whatsapp.py",
+    "/app/backend/tests/cleanup_iter13.py",
+    "/app/test_reports/pytest/iter13_results.xml"
+  ],
+  "action_items": [
+    "Fix the Google Maps iframe not re-navigating when business.maps_query loads (key or conditional render) — the 'Abrir en Maps' link and the src attribute are already correct.",
+    "Make run_recordatorios atomic per appointment to avoid duplicate reminder emails on overlapping cron runs.",
+    "Optional: protect GET /api/appointments/{id} (PII exposure)."
+  ],
+  "critical_code_review_comments": [
+    "Home.jsx: iframe src is derived from async state; iframes with a src changed after load are unreliable — use key={business.maps_query || 'loading'} or defer render.",
+    "server.py run_recordatorios: claim-then-send pattern needed (find_one_and_update with recordatorio_enviado filter) for idempotency; cron providers retry.",
+    "server.py is 694 lines and mixes email safety, cron, business, appointments — consider splitting into routers/modules soon."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter13_whatsapp.py",
+    "/app/backend/tests/cleanup_iter13.py"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "90% (map iframe render defect)"},
+  "seed_data_creation": "Created 5 TEST_ appointments (phones +34699100101..104, +34699100201, email delivered@resend.dev). All cancelled afterwards via admin-cancel (pytest fixture + cleanup_iter13.py, verified 'total cancelled: 1' remaining one).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin pititagomez31@gmail.com / 58Barber2025! (from /app/memory/test_credentials.md); cron Bearer secret as provided",
+  "context_for_next_testing_agent": "Verified in iter13: POST /api/appointments returns whatsapp_links.cliente (wa.me/<digits>?text=... with date, hour, service, client name) and whatsapp_links.barbero=null (BUSINESS_WHATSAPP empty — expected); persistence of client_email/confirmado=false/recordatorio_enviado=false; 401 without token on PUT /confirmar and POST /recordatorio, 404 on unknown ids; cron 401 without/with bad Bearer, 200 {ok:true} with correct Bearer; cron e2e set recordatorio_enviado=true and backend log shows 'Recordatorios: N citas procesadas' with email proxy returning HTTP 202 (no errors). GET /api/business exposes maps_query with 'Multitienda Veloz 24hr'. Frontend: booking mobile e2e + admin agenda badge/confirm/reminder all pass. Note 2026-08-30 is a Sunday (no slots) — book on 08-31 or later. Only outstanding item is the maps iframe remount defect.",
+  "rca_of_the_issue": "Maps: Home.jsx renders <iframe src={maps?q=<business.maps_query || fallback>}> on first paint while business state is still {}. Once /api/business resolves, React patches the src attribute of the mounted iframe; the Google Maps embed (already loaded with the fallback 'Tenerife, España' query) does not re-navigate, so the user keeps seeing the wrong map even though DOM/attribute assertions pass. Reproduction: load /, scroll to #ubicacion, wait 12s — src contains Multitienda but the rendered map shows the Tenerife island. Mitigation: key the iframe on maps_query or render it only after business loads."
+}

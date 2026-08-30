@@ -108,6 +108,22 @@ function AgendaPanel() {
     } catch (e) { toast.error(formatErr(e)); }
   };
 
+  const confirmar = async (id) => {
+    try {
+      await api.put(`/appointments/${id}/confirmar`);
+      toast.success("Cita confirmada");
+      load();
+    } catch (e) { toast.error(formatErr(e)); }
+  };
+
+  const recordatorio = async (id) => {
+    try {
+      const { data } = await api.post(`/appointments/${id}/recordatorio`);
+      window.open(data.url, "_blank");
+      toast.success("Abriendo WhatsApp con el recordatorio");
+    } catch (e) { toast.error(formatErr(e)); }
+  };
+
   const shift = (dir) => {
     if (view === "day") setAnchor(addDays(anchor, dir));
     else if (view === "week") setAnchor(addDays(anchor, dir * 7));
@@ -174,6 +190,19 @@ function AgendaPanel() {
                       {a.booker_name && <p className="text-[10px] text-neutral-500 italic">reservado por {a.booker_name}</p>}
                       <p className="text-neutral-500">{a.service_name}</p>
                       <span className="text-neutral-500 flex items-center gap-1 mt-1"><Phone className="h-3 w-3" />{a.client_phone}</span>
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <span data-testid={`estado-${a.id}`} className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${a.confirmado ? "bg-green-500/15 text-green-400" : "bg-yellow-500/15 text-yellow-400"}`}>
+                          {a.confirmado ? "Confirmada" : "Pendiente"}
+                        </span>
+                        {!a.confirmado && (
+                          <button data-testid={`confirmar-${a.id}`} onClick={() => confirmar(a.id)} className="text-[10px] px-1.5 py-0.5 rounded border border-[#D4B77A]/40 text-[#D4B77A] hover:bg-[#D4B77A] hover:text-[#14141A]">
+                            Confirmar
+                          </button>
+                        )}
+                        <button data-testid={`recordatorio-${a.id}`} onClick={() => recordatorio(a.id)} className="text-[10px] px-1.5 py-0.5 rounded border border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366] hover:text-white">
+                          Recordatorio
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

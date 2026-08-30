@@ -27,7 +27,7 @@ export default function Booking() {
   const [slots, setSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [time, setTime] = useState("");
-  const [form, setForm] = useState({ name: "", nickname: "", phone: "", forOther: false, otherName: "", policy: false });
+  const [form, setForm] = useState({ name: "", nickname: "", phone: "", email: "", forOther: false, otherName: "", policy: false });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null); // appointment
 
@@ -75,6 +75,7 @@ export default function Booking() {
         client_name: form.forOther ? guestName : bookerName,
         client_nickname: form.nickname.trim(),
         client_phone: form.phone.trim(),
+        client_email: form.email.trim(),
         booker_name: form.forOther ? bookerName : "",
         accepted_policy: true,
       };
@@ -89,10 +90,11 @@ export default function Booking() {
   };
 
   if (done) {
-    const waMsg = encodeURIComponent(
-      `¡Hola +58 BarberStudio! Confirmo mi cita:\n\n📅 ${done.date} a las ${done.start}\n✂️ ${done.service_name} (${done.duration_min} min)\n👤 ${done.client_name}\n📞 ${done.client_phone}\n\nAcepto política del 50%. ¡Nos vemos!`
-    );
-    const wa = `https://wa.me/${business.whatsapp}?text=${waMsg}`;
+    const links = done.whatsapp_links || {};
+    const fallbackWa = business.whatsapp
+      ? `https://wa.me/${business.whatsapp}?text=${encodeURIComponent(`¡Hola +58 BarberStudio! Confirmo mi cita: ${done.date} a las ${done.start} · ${done.service_name}`)}`
+      : null;
+    const clienteUrl = links.cliente || fallbackWa;
     return (
       <div className="min-h-screen bg-[#14141A] text-neutral-100 noise-bg grid place-items-center px-6 py-16" data-testid="booking-success">
         <div className="max-w-lg w-full text-center fade-up">
@@ -110,9 +112,16 @@ export default function Booking() {
               <p className="flex justify-between border-t border-[#2A2A32] pt-3 mt-3"><span className="text-neutral-500">Código</span><span className="font-mono text-xs">{done.id.slice(0, 8)}</span></p>
             </CardContent>
           </Card>
-          <a href={wa} target="_blank" rel="noreferrer" className="block mt-6" data-testid="confirm-whatsapp-btn">
-            <Button className="w-full h-12 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-semibold">Enviar confirmación por WhatsApp</Button>
-          </a>
+          {clienteUrl && (
+            <a href={clienteUrl} target="_blank" rel="noreferrer" className="block mt-6" data-testid="confirm-whatsapp-btn">
+              <Button className="w-full h-12 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-semibold">Confirmar mi cita por WhatsApp</Button>
+            </a>
+          )}
+          {links.barbero && (
+            <a href={links.barbero} target="_blank" rel="noreferrer" className="block mt-3" data-testid="notify-barber-btn">
+              <Button variant="outline" className="w-full h-12 border-[#25D366]/50 bg-transparent text-[#25D366] hover:bg-[#25D366]/10 font-semibold">Notificar al barbero por WhatsApp</Button>
+            </a>
+          )}
           <Link to="/" className="block mt-4">
             <Button variant="outline" className="w-full border-white/10 bg-transparent hover:bg-white/5">Volver al inicio</Button>
           </Link>
@@ -220,6 +229,10 @@ export default function Booking() {
             <div>
               <Label className="text-xs tracking-overline uppercase text-neutral-500">Tu teléfono</Label>
               <Input data-testid="input-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="+34 600 00 00 00" />
+            </div>
+            <div>
+              <Label className="text-xs tracking-overline uppercase text-neutral-500">Tu email (opcional, para recordatorio)</Label>
+              <Input data-testid="input-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="tu@email.com" />
             </div>
             <div>
               <Label className="text-xs tracking-overline uppercase text-neutral-500">Apodo (opcional)</Label>

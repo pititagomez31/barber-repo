@@ -28,6 +28,14 @@ App web existente (React + FastAPI + MongoDB, deploy en Railway: https://barber-
 - Crash producción móvil "removeChild on Node" (ErrorBoundary "Algo se ha torcido") en admin y flujo de reserva: causa raíz = `<html lang="en">` con contenido ES → Chrome móvil auto-traducía y Google Translate envolvía text nodes en `<font>`, rompiendo el DOM de React 19. Fix en frontend/public/index.html: `lang="es" class="notranslate"` + `<meta name="google" content="notranslate">` + title propio. Verificado por testing agent (iteration_12): 0 ErrorBoundary, 0 errores JS en Home/reserva e2e/admin (15 cambios de pestaña, 390px).
 - Fix adicional: overflow horizontal del TabsList del admin en móvil (scrollWidth 576→390) envolviéndolo en div con overflow-x-auto. Auto-verificado con screenshot 390px.
 
+## Feature WhatsApp + email (2026-08-29)
+- Sistema de confirmación/recordatorios wa.me: POST /api/appointments devuelve whatsapp_links {cliente, barbero} (barbero null si BUSINESS_WHATSAPP vacío); booking muestra botones "Confirmar mi cita por WhatsApp" y "Notificar al barbero por WhatsApp"; nuevo campo email opcional en reserva (client_email).
+- Admin Agenda: badge Estado Confirmada/Pendiente + botón Confirmar (PUT /api/appointments/{id}/confirmar) + botón Recordatorio (POST /api/appointments/{id}/recordatorio → abre wa.me).
+- Cron diario 8:00 Europe/Madrid (.emergent/crons.yml → POST /api/cron/recordatorios, Bearer WEBHOOK_CRON_SECRET): procesa citas de mañana con recordatorio_enviado=false, las marca y envía email con el enlace wa.me vía Resend gestionado (EMERGENT_EMAIL_KEY). Para Railway: cron-job.org con el mismo endpoint+Bearer.
+- Mapa: /api/business expone maps_query="Multitienda Veloz 24hr, Avenida de Los Majuelos 51C..." usado por iframe y "Abrir en Maps" (fix Western Union).
+- Pendiente usuario en Railway: BUSINESS_WHATSAPP (número del barbero), WEBHOOK_CRON_SECRET, BUSINESS_ADDRESS, y cron externo.
+- Fixes post-testing (iter13): iframe de Maps remonta con key al cargar maps_query (ya muestra Multitienda Veloz 24hr, verificado con screenshot); run_recordatorios con claim atómico find_one_and_update (doble cron simultáneo → 1 y 0 procesadas, sin emails duplicados).
+
 ## Backlog priorizado
 - P0: Usuario debe actualizar BUSINESS_ADDRESS en Railway (backend) y hacer redeploy del frontend con Clear build cache tras Save to GitHub.
 - P0 (seguridad, aplazado por el usuario): repo público con credenciales en historial — poner privado y rotar Mongo password, ADMIN_PASSWORD, JWT_SECRET.
