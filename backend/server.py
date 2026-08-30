@@ -612,7 +612,7 @@ async def run_recordatorios() -> int:
     logger.info("Recordatorios: %d citas procesadas para %s", claimed_count, tomorrow)
     return claimed_count
 
-@api.post("/cron/recordatorios")
+@api.api_route("/cron/recordatorios", methods=["GET", "POST"])
 async def cron_recordatorios(request: Request, background: BackgroundTasks):
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     auth = request.headers.get("authorization", "")

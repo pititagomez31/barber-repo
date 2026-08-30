@@ -1,0 +1,29 @@
+{
+  "summary": "Regresión focalizada del fix 405 en /api/cron/recordatorios (backend only, preview URL). 8/8 pruebas pasadas: GET y POST sin Authorization -> 401; GET y POST con Bearer incorrecto -> 401; GET con Bearer correcto -> 200 {ok:true}; POST con Bearer correcto -> 200 {ok:true}; PUT sigue devolviendo 405 (superficie de métodos limitada correctamente). E2E: cita creada para mañana 2026-08-31 (Europe/Madrid) con +34699100555 y client_email=delivered@resend.dev devolvió whatsapp_links.cliente (wa.me/34699100555?text=...) y recordatorio_enviado=false; tras GET al cron con Bearer correcto, recordatorio_enviado pasó a true en ~2-4s. Logs backend: 'Recordatorios: 1 citas procesadas para 2026-08-31' + POST email 202 Accepted, sin errores. Login admin OK. Todas las citas de prueba limpiadas con admin-cancel (verificado status=cancelled).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_cron_method.py",
+    "/app/test_reports/pytest/iter14.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "cron_recordatorios usa hmac.compare_digest correctamente y ack inmediato con BackgroundTasks; con api_route GET+POST el endpoint es compatible con cron-job.org en su método por defecto (GET). Sin observaciones bloqueantes.",
+    "Nota menor (no bloqueante): un GET idempotente que dispara envío de emails puede ser reejecutado por prefetchers/proxies; el claim atómico (find_one_and_update con recordatorio_enviado:{$ne:true}) evita duplicados, lo cual mitiga el riesgo."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter14_cron_method.py"],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend only request)"},
+  "seed_data_creation": "1 cita TEST_Cron GET QA para 2026-08-31 con +34699100555 / delivered@resend.dev, cancelada al finalizar",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "test_credentials": "admin pititagomez31@gmail.com / 58Barber2025! (de /app/memory/test_credentials.md); cron secret desde /app/backend/.env",
+  "context_for_next_testing_agent": "El fix del método HTTP está verificado en preview: GET y POST funcionan igual, otros métodos dan 405. La batería completa de la feature WhatsApp/email/cron está en /app/backend/tests/test_iter13_whatsapp.py (iter13, 13/13). Para nuevas citas usar teléfonos nuevos (límite de 2 citas activas por teléfono) y limpiar con POST /api/appointments/{id}/admin-cancel. En producción Railway el fix requiere Save to GitHub + redeploy.",
+  "rca_of_the_issue": "cron-job.org envía GET por defecto; el endpoint estaba declarado solo con @api.post, por lo que FastAPI devolvía 405. El cambio a @api.api_route(methods=['GET','POST']) resuelve el 405 manteniendo la autorización Bearer y el procesamiento en background."
+}
