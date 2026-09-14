@@ -1,53 +1,43 @@
-import { useEffect } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import Home from "@/pages/Home";
 import Booking from "@/pages/Booking";
+import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
-import { Scissors } from "lucide-react";
+import Legal from "@/pages/Legal";
 
-const Nav = () => {
-  const loc = useLocation();
-  return (
-    <nav className="nav-bar" data-testid="main-nav">
-      <Link to="/" className="brand" data-testid="brand-link">
-        <Scissors size={22} className="brand-icon" />
-        <span className="brand-name">+58 <b>BarberStudio</b></span>
-      </Link>
-      <div className="nav-links">
-        <Link
-          to="/"
-          data-testid="nav-reservar"
-          className={loc.pathname === "/" ? "nav-link active" : "nav-link"}
-        >
-          Reservar
-        </Link>
-        <Link
-          to="/admin"
-          data-testid="nav-admin"
-          className={loc.pathname.startsWith("/admin") ? "nav-link active" : "nav-link"}
-        >
-          Panel barbero
-        </Link>
-      </div>
-    </nav>
-  );
-};
+function Protected({ children }) {
+  const { user } = useAuth();
+  if (user === undefined) return <div className="min-h-screen grid place-items-center text-neutral-400" data-testid="auth-loading">Cargando…</div>;
+  if (!user) return <Navigate to="/admin/login" replace />;
+  return children;
+}
 
 function App() {
-  useEffect(() => {
-    document.title = "+58 BarberStudio";
-  }, []);
   return (
     <div className="App">
-      <BrowserRouter>
-        <Nav />
-        <Routes>
-          <Route path="/" element={<Booking />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-        </Routes>
-      </BrowserRouter>
-      <Toaster position="top-center" richColors />
+      <ErrorBoundary>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/reservar" element={<Booking />} />
+              <Route path="/privacidad" element={<Legal type="privacidad" />} />
+              <Route path="/aviso-legal" element={<Legal type="aviso" />} />
+              <Route path="/cookies" element={<Legal type="cookies" />} />
+              <Route path="/terms" element={<Legal type="terms" />} />
+              <Route path="/data-deletion" element={<Legal type="data-deletion" />} />
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin" element={<Protected><AdminDashboard /></Protected>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+          <Toaster theme="dark" position="top-center" richColors />
+        </AuthProvider>
+      </ErrorBoundary>
     </div>
   );
 }
