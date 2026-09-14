@@ -101,6 +101,7 @@ function AgendaPanel() {
       .then((r) => setAppts(r.data))
       .catch((e) => toast.error(formatErr(e)));
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [range.from, range.to]);
 
   const cancel = async (id) => {
@@ -366,6 +367,7 @@ function SchedulePanel() {
       .then((r) => setOverrides(Array.isArray(r.data) ? r.data : []))
       .catch((e) => toast.error(formatErr(e)));
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadOverrides(); }, [month]);
 
   const overrideMap = useMemo(() => {
