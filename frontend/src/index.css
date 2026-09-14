@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bs-bg: #100f0d;
+  --bs-bg-2: #17150f;
+  --bs-card: #1c1a15;
+  --bs-line: #2c2820;
+  --bs-gold: #c9a24b;
+  --bs-gold-2: #e5c877;
+  --bs-cream: #efe7d6;
+  --bs-muted: #9a9283;
+}
+
+* { border-color: var(--bs-line); }
+
+body {
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+  background: var(--bs-bg);
+  color: var(--bs-cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+@layer base {
+  :root {
+    --background: 40 20% 6%;
+    --foreground: 40 30% 89%;
+    --card: 44 14% 10%;
+    --card-foreground: 40 30% 89%;
+    --popover: 44 14% 10%;
+    --popover-foreground: 40 30% 89%;
+    --primary: 42 55% 54%;
+    --primary-foreground: 40 30% 6%;
+    --secondary: 42 14% 15%;
+    --secondary-foreground: 40 30% 89%;
+    --muted: 42 10% 16%;
+    --muted-foreground: 42 8% 60%;
+    --accent: 42 14% 15%;
+    --accent-foreground: 40 30% 89%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 42 14% 15%;
+    --input: 42 14% 18%;
+    --ring: 42 55% 54%;
+    --radius: 0.5rem;
+  }
+}
