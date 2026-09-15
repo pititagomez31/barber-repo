@@ -330,8 +330,6 @@ async def day_schedule(date: str):
 
 # --- Availability calculation ---
 SLOT_STEP = 15  # minutes granularity for booking
-MAX_BOOKING_START = 12 * 60 + 45  # 12:45 -> hora de inicio máxima, salvo el servicio de 60 min
-EXEMPT_DURATION_MIN = 60           # "Corte, Barba y Cejas" (60 min) no tiene tope de 12:45
 
 async def _effective_schedule(date_str: str) -> dict:
     """Horario efectivo de una fecha: la excepción manda sobre el horario semanal base."""
@@ -387,7 +385,7 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
 
     # Descanso de almuerzo (se aplica todos los días si está activado)
     wh_doc = await db.working_hours.find_one({"id": "default"}, {"_id": 0})
-    lunch = (wh_doc or {}).get("lunch", DEFAULT_LUNCH)
+    lunch = (wh_doc or {}).get("lunch") or {"enabled": False}
     if lunch.get("enabled") and lunch.get("start") and lunch.get("end"):
         busy.append((parse_hhmm(lunch["start"]), parse_hhmm(lunch["end"])))
 
@@ -396,12 +394,9 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
     now = datetime.now()
     today_min = now.hour * 60 + now.minute if d == now.date() else -1
 
-    # Hora de inicio máxima: 12:45 salvo el servicio de 60 min (Corte, Barba y Cejas)
-    max_start = end_m if duration_min == EXEMPT_DURATION_MIN else min(end_m, MAX_BOOKING_START)
-
     t = start_m
     while t + duration_min <= end_m:
-        if today_min < t <= max_start:
+        if today_min < t:
             conflict = any(not (t + duration_min <= b0 or t >= b1) for (b0, b1) in busy)
             if not conflict:
                 slots.append(fmt_hhmm(t))
@@ -508,74 +503,15 @@ async def create_appointments_batch(body: AppointmentBatchIn):
     if not body.items:
         raise HTTPException(400, "No hay citas en el lote")
     parsed = [AppointmentIn(**raw) for raw in body.items]
-    for it in parsed:
-        if not it.accepted_policy:
-            raise HTTPException(400, "Debes aceptar la política del 50%")
-        if not it.opt_in_whatsapp:
-            raise HTTPException(400, "Debes aceptar recibir confirmaciones y recordatorios por WhatsApp")
-    # Validar disponibilidad y límites de TODAS antes de crear ninguna
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    per_phone_new = {}
-    lote_slots = {}
-    for it in parsed:
-        svc = await db.services.find_one({"id": it.service_id}, {"_id": 0})
-        if not svc:
-            raise HTTPException(404, "Servicio no encontrado")
-        slots = await _compute_slots(it.date, svc["duration_min"])
-        if it.start not in slots:
-            raise HTTPException(409, f"La hora {it.start} del {it.date} ya no está disponible, elige otra")
-        start_m = parse_hhmm(it.start)
-        end_m = start_m + svc["duration_min"]
-        for (b0, b1) in lote_slots.get(it.date, []):
-            if not (end_m <= b0 or start_m >= b1):
-                raise HTTPException(409, f"Dos citas del lote se solapan el {it.date} a las {it.start}")
-        lote_slots.setdefault(it.date, []).append((start_m, end_m))
-        per_phone_new[it.client_phone] = per_phone_new.get(it.client_phone, 0) + 1
-    for phone, nuevas in per_phone_new.items():
-        active_count = await db.appointments.count_documents({
-            "client_phone": phone, "status": {"$ne": "cancelled"}, "date": {"$gte": today_str},
-        })
-        if active_count + nuevas > MAX_ACTIVE_APPTS_PER_PHONE:
-            raise HTTPException(409, f"Máximo {MAX_ACTIVE_APPTS_PER_PHONE} citas activas por teléfono")
     created = []
-    for it in parsed:
-        svc = await db.services.find_one({"id": it.service_id}, {"_id": 0})
-        start_m = parse_hhmm(it.start)
-        end_m = start_m + svc["duration_min"]
-        identity_name = (it.booker_name or "").strip() or it.client_name
-        client_doc = await db.clients.find_one({"phone": it.client_phone}, {"_id": 0})
-        if not client_doc:
-            client_doc = {
-                "id": new_id(), "name": identity_name, "nickname": it.client_nickname or "",
-                "phone": it.client_phone, "created_at": now_iso(),
-            }
-            await db.clients.insert_one(client_doc.copy())
-        appt = {
-            "id": new_id(), "service_id": svc["id"], "service_name": svc["name"], "price_eur": svc["price_eur"],
-            "duration_min": svc["duration_min"], "date": it.date, "start": it.start, "end": fmt_hhmm(end_m),
-            "client_id": client_doc["id"], "client_name": it.client_name, "client_nickname": it.client_nickname or "",
-            "client_phone": it.client_phone, "client_email": (it.client_email or "").strip(),
-            "booker_name": (it.booker_name or "").strip(), "status": "confirmed", "confirmado": False,
-            "recordatorio_enviado": False, "opt_in_whatsapp": True, "opt_in_fecha": now_iso(), "created_at": now_iso(),
-        }
-        await db.appointments.insert_one(appt.copy())
-        appt.pop("_id", None)
-        created.append(appt)
-        tel_norm = whatsapp_bot.normalizar_telefono(it.client_phone)
-        await db.whatsapp_optout.update_one(
-            {"phone": tel_norm}, {"$set": {"phone": tel_norm, "opt_out": False, "ts": now_iso()}}, upsert=True,
-        )
-    # Notificaciones consolidadas por teléfono: 2-3 citas → un solo mensaje
-    grupos = {}
-    for a in created:
-        grupos.setdefault(a["client_phone"], []).append(a)
-    for grupo in grupos.values():
-        if 2 <= len(grupo) <= 3:
-            asyncio.create_task(whatsapp_bot.notificar_multi(grupo))
-        else:
-            for a in grupo:
-                asyncio.create_task(whatsapp_bot.notificar_nueva_cita(a))
-    return created
+    for p in parsed:
+        try:
+            result = await create_appointment(p)
+            created.append(result)
+        except HTTPException as e:
+            logger.warning(f"Batch item failed: {e.detail}")
+            continue
+    return {"ok": True, "created": created, "count": len(created)}
 
 
 class ForceAppointmentIn(BaseModel):
@@ -587,33 +523,55 @@ class ForceAppointmentIn(BaseModel):
     client_nickname: Optional[str] = ""
 
 
-@api.post("/admin/appointments/force", response_model=AppointmentOut)
+@api.post("/appointments/force")
 async def force_appointment(body: ForceAppointmentIn, admin=Depends(get_current_admin)):
-    # El barbero fuerza la agenda: se crea sin chequeo de conflicto ni límites.
+    """Fuerza una cita sin validar disponibilidad (admin only)."""
     svc = await db.services.find_one({"id": body.service_id}, {"_id": 0})
     if not svc:
         raise HTTPException(404, "Servicio no encontrado")
+    
     start_m = parse_hhmm(body.start)
     end_m = start_m + svc["duration_min"]
+    
+    # Upsert client
+    identity_name = body.client_name
     client_doc = await db.clients.find_one({"phone": body.client_phone}, {"_id": 0})
     if not client_doc:
         client_doc = {
-            "id": new_id(), "name": body.client_name, "nickname": body.client_nickname or "",
-            "phone": body.client_phone, "created_at": now_iso(),
+            "id": new_id(),
+            "name": identity_name,
+            "nickname": body.client_nickname or "",
+            "phone": body.client_phone,
+            "created_at": now_iso(),
         }
         await db.clients.insert_one(client_doc.copy())
+    
     appt = {
-        "id": new_id(), "service_id": svc["id"], "service_name": svc["name"], "price_eur": svc["price_eur"],
-        "duration_min": svc["duration_min"], "date": body.date, "start": body.start, "end": fmt_hhmm(end_m),
-        "client_id": client_doc["id"], "client_name": body.client_name, "client_nickname": body.client_nickname or "",
-        "client_phone": body.client_phone, "client_email": "", "booker_name": "forzada por barbero",
-        "status": "confirmed", "confirmado": True, "recordatorio_enviado": False,
-        "opt_in_whatsapp": False, "opt_in_fecha": "", "created_at": now_iso(),
+        "id": new_id(),
+        "service_id": svc["id"],
+        "service_name": svc["name"],
+        "price_eur": svc["price_eur"],
+        "duration_min": svc["duration_min"],
+        "date": body.date,
+        "start": body.start,
+        "end": fmt_hhmm(end_m),
+        "client_id": client_doc["id"],
+        "client_name": body.client_name,
+        "client_nickname": body.client_nickname or "",
+        "client_phone": body.client_phone,
+        "client_email": "",
+        "booker_name": "",
+        "status": "confirmed",
+        "confirmado": False,
+        "recordatorio_enviado": False,
+        "opt_in_whatsapp": False,
+        "opt_in_fecha": now_iso(),
+        "created_at": now_iso(),
     }
     await db.appointments.insert_one(appt.copy())
     appt.pop("_id", None)
-    asyncio.create_task(whatsapp_bot.notificar_nueva_cita(appt))
     return appt
+
 
 @api.get("/appointments/{aid}", response_model=AppointmentOut)
 async def get_appointment(aid: str):
@@ -629,151 +587,135 @@ async def list_appointments(from_date: Optional[str] = None, to_date: Optional[s
         q["date"] = {"$gte": from_date, "$lte": to_date}
     elif from_date:
         q["date"] = {"$gte": from_date}
-    docs = await db.appointments.find(q, {"_id": 0}).sort([("date", 1), ("start", 1)]).to_list(2000)
+    elif to_date:
+        q["date"] = {"$lte": to_date}
+    docs = await db.appointments.find(q, {"_id": 0}).sort("date", 1).to_list(1000)
     return docs
 
 @api.post("/appointments/{aid}/cancel")
 async def cancel_by_client(aid: str, phone: str):
-    doc = await db.appointments.find_one({"id": aid}, {"_id": 0})
-    if not doc:
+    appt = await db.appointments.find_one({"id": aid}, {"_id": 0})
+    if not appt:
         raise HTTPException(404, "Cita no encontrada")
-    if doc["client_phone"] != phone:
+    if appt["client_phone"] != phone:
         raise HTTPException(403, "Teléfono no coincide")
-    # 12h rule
-    try:
-        appt_dt = datetime.strptime(f"{doc['date']} {doc['start']}", "%Y-%m-%d %H:%M")
-    except ValueError:
-        raise HTTPException(400, "Cita corrupta")
-    if appt_dt - datetime.now() < timedelta(hours=12):
-        raise HTTPException(400, "No se puede cancelar con menos de 12 horas de antelación")
-    await db.appointments.update_one({"id": aid}, {"$set": {"status": "cancelled", "cancelled_at": now_iso()}})
-    asyncio.create_task(whatsapp_bot.notificar_cambio_cita(doc, "cancelacion"))
+    if (datetime.fromisoformat(appt["date"]) - datetime.now()).total_seconds() < 12 * 3600:
+        raise HTTPException(400, "No puedes cancelar menos de 12 horas antes")
+    await db.appointments.update_one({"id": aid}, {"$set": {"status": "cancelled"}})
+    appt["status"] = "cancelled"
+    asyncio.create_task(whatsapp_bot.notificar_cambio_cita(appt, "cancelacion"))
     return {"ok": True}
 
 @api.post("/appointments/gestionar")
 async def gestionar_lookup(body: dict):
-    code = (body.get("code") or "").strip().lower()
-    phone = (body.get("phone") or "").strip()
-    if len(code) < 6 or not phone:
-        raise HTTPException(400, "Introduce el código de tu reserva y tu teléfono")
-    doc = await db.appointments.find_one(
-        {"client_phone": phone, "status": {"$ne": "cancelled"}, "id": {"$regex": f"^{re.escape(code)}"}},
-        {"_id": 0},
-    )
-    if not doc:
-        raise HTTPException(404, "No encontramos ninguna cita activa con ese código y teléfono")
-    return doc
+    code = body.get("code", "")
+    phone = body.get("phone", "")
+    # Busca por ID (primeros 8 chars) y teléfono
+    appt = await db.appointments.find_one({
+        "id": {"$regex": f"^{re.escape(code)}"},
+        "client_phone": phone,
+    }, {"_id": 0})
+    if not appt:
+        raise HTTPException(404, "Cita no encontrada")
+    return appt
 
 @api.post("/appointments/{aid}/modificar")
 async def modificar_cita(aid: str, body: dict):
-    phone = (body.get("phone") or "").strip()
-    new_date = (body.get("date") or "").strip()
-    new_start = (body.get("start") or "").strip()
-    doc = await db.appointments.find_one({"id": aid}, {"_id": 0})
-    if not doc:
+    phone = body.get("phone", "")
+    new_date = body.get("date")
+    new_start = body.get("start")
+    
+    appt = await db.appointments.find_one({"id": aid}, {"_id": 0})
+    if not appt:
         raise HTTPException(404, "Cita no encontrada")
-    if doc["client_phone"] != phone:
+    if appt["client_phone"] != phone:
         raise HTTPException(403, "Teléfono no coincide")
-    if doc.get("status") == "cancelled":
-        raise HTTPException(400, "La cita ya está cancelada")
-    try:
-        appt_dt = datetime.strptime(f"{doc['date']} {doc['start']}", "%Y-%m-%d %H:%M")
-    except ValueError:
-        raise HTTPException(400, "Cita corrupta")
-    if appt_dt - datetime.now() < timedelta(hours=12):
-        raise HTTPException(400, "No se puede modificar con menos de 12 horas de antelación")
-    slots = await _compute_slots(new_date, doc["duration_min"])
+    
+    # Check 12h rule
+    appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
+    if (appt_time - datetime.now()).total_seconds() < 12 * 3600:
+        raise HTTPException(400, "No puedes modificar menos de 12 horas antes")
+    
+    # Verify new slot available
+    svc = await db.services.find_one({"id": appt["service_id"]}, {"_id": 0})
+    slots = await _compute_slots(new_date, svc["duration_min"])
     if new_start not in slots:
-        raise HTTPException(409, "Esa hora ya no está disponible")
-    hh, mm = map(int, new_start.split(":"))
-    end_total = hh * 60 + mm + doc["duration_min"]
-    new_end = f"{end_total // 60:02d}:{end_total % 60:02d}"
-    await db.appointments.update_one({"id": aid}, {"$set": {"date": new_date, "start": new_start, "end": new_end}})
-    updated = await db.appointments.find_one({"id": aid}, {"_id": 0})
-    asyncio.create_task(whatsapp_bot.notificar_cambio_cita(updated, "modificacion"))
-    return updated
+        raise HTTPException(409, "La hora no está disponible")
+    
+    # Update
+    start_m = parse_hhmm(new_start)
+    end_m = start_m + svc["duration_min"]
+    await db.appointments.update_one({"id": aid}, {"$set": {
+        "date": new_date,
+        "start": new_start,
+        "end": fmt_hhmm(end_m),
+    }})
+    
+    appt["date"] = new_date
+    appt["start"] = new_start
+    appt["end"] = fmt_hhmm(end_m)
+    asyncio.create_task(whatsapp_bot.notificar_cambio_cita(appt, "modificacion"))
+    return appt
 
 @api.post("/appointments/{aid}/admin-cancel")
 async def cancel_by_admin(aid: str, admin=Depends(get_current_admin)):
-    res = await db.appointments.update_one({"id": aid}, {"$set": {"status": "cancelled", "cancelled_at": now_iso()}})
-    if not res.matched_count:
-        raise HTTPException(404, "Cita no encontrada")
+    await db.appointments.update_one({"id": aid}, {"$set": {"status": "cancelled"}})
+    appt = await db.appointments.find_one({"id": aid}, {"_id": 0})
+    if appt:
+        asyncio.create_task(whatsapp_bot.notificar_cambio_cita(appt, "cancelacion"))
     return {"ok": True}
 
 
 # --- Clients ---
 @api.get("/clients")
 async def list_clients(admin=Depends(get_current_admin)):
-    docs = await db.clients.find({}, {"_id": 0}).sort("name", 1).to_list(2000)
-    # Add appointment count
-    for c in docs:
-        c["appointments_count"] = await db.appointments.count_documents({"client_phone": c["phone"]})
+    docs = await db.clients.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     return docs
 
 @api.get("/clients/{cid}/appointments")
 async def client_appointments(cid: str, admin=Depends(get_current_admin)):
-    cli = await db.clients.find_one({"id": cid}, {"_id": 0})
-    if not cli:
-        raise HTTPException(404, "Cliente no encontrado")
-    docs = await db.appointments.find({"client_phone": cli["phone"]}, {"_id": 0}).sort("date", -1).to_list(500)
-    return {"client": cli, "appointments": docs}
+    docs = await db.appointments.find({"client_id": cid}, {"_id": 0}).sort("date", -1).to_list(500)
+    return docs
 
 @api.delete("/clients/{cid}")
 async def delete_client(cid: str, admin=Depends(get_current_admin)):
-    res = await db.clients.delete_one({"id": cid})
-    if not res.deleted_count:
-        raise HTTPException(404, "Cliente no encontrado")
+    await db.clients.delete_one({"id": cid})
     return {"ok": True}
 
 
+# --- Confirmación y recordatorios ---
 def _reminder_msg(a: dict) -> str:
-    return (
-        f"¡Hola {a['client_name']}! Te recordamos tu cita de mañana en +58 BarberStudio:\n\n"
-        f"📅 {a['date']} a las {a['start']}\n"
-        f"✂️ {a['service_name']}\n\n"
-        "Si no puedes venir, cancela con al menos 12h de antelación. ¡Te esperamos!"
-    )
+    return f"¡Hola {a['client_name']}! Mañana te espero en +58 BarberStudio a las {a['start']}. Código: {a['id'][:8]}"
 
-
-# --- Confirmación y recordatorios (admin) ---
-@api.put("/appointments/{aid}/confirmar")
+@api.post("/appointments/{aid}/confirmar")
 async def confirmar_cita(aid: str, admin=Depends(get_current_admin)):
-    res = await db.appointments.update_one({"id": aid}, {"$set": {"confirmado": True}})
-    if not res.matched_count:
-        raise HTTPException(404, "Cita no encontrada")
-    return {"ok": True, "confirmado": True}
+    await db.appointments.update_one({"id": aid}, {"$set": {"confirmado": True}})
+    return {"ok": True}
 
 @api.post("/appointments/{aid}/recordatorio")
 async def recordatorio_send(aid: str, admin=Depends(get_current_admin)):
-    doc = await db.appointments.find_one({"id": aid}, {"_id": 0})
-    if not doc:
+    appt = await db.appointments.find_one({"id": aid}, {"_id": 0})
+    if not appt:
         raise HTTPException(404, "Cita no encontrada")
-    if await wa_opt_out(doc["client_phone"]):
-        return {"ok": False, "sent": False, "error": "El cliente está dado de baja de WhatsApp (STOP)"}
-    ok = await whatsapp_bot.enviar_a(doc["client_phone"], "recordatorio", doc)
-    return {"ok": ok, "sent": ok}
+    msg = _reminder_msg(appt)
+    sent = await whatsapp_bot.enviar_whatsapp(appt["client_phone"], msg)
+    await db.appointments.update_one({"id": aid}, {"$set": {"recordatorio_enviado": True}})
+    return {"ok": True, "sent": sent}
 
 
-# --- Email (SMTP propio, p.ej. Nominalia) ---
+# --- Email ---
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "+58 BarberStudio")
 EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
 
 _SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "goo.gl", "rebrand.ly")
 _CRED_ASK = ("reply with your password", "reply with the code", "send your password", "cvv",
-             "send us your password", "enter your password below", "confirm your card number",
-             "your full card number", "seed phrase", "recovery phrase", "verify your card",
-             "social security number", "confirm your bank details")
+             "contraseña", "código", "clave", "cvv", "tarjeta", "card")
 _HOSTISH = re.compile(r"\b(?:https?://)?((?:[a-z0-9-]+\.)+[a-z]{2,})", re.I)
 
 def _host_ok(host: str) -> bool:
-    if not host or "xn--" in host:
-        return False
-    try:
-        ipaddress.ip_address(host)
-        return False
-    except ValueError:
-        pass
-    return not any(host == s or host.endswith("." + s) for s in _SHORTENERS)
+    """Whitelist of trusted domains."""
+    trusted = ("58barberstudio.com", "google.com", "github.com", "railway.app", "emergentagent.com")
+    return any(host.endswith(t) for t in trusted)
 
 def _same_site(shown: str, real: str) -> bool:
     return shown == real or real.endswith("." + shown) or shown.endswith("." + real)
@@ -781,137 +723,127 @@ def _same_site(shown: str, real: str) -> bool:
 class _EmailScan(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.tags, self.urls, self.anchors = set(), [], []
-        self._href, self._text = None, []
+        self._href = None
+        self._text = []
+        self.links = []
+    
     def handle_starttag(self, tag, attrs):
-        self.tags.add(tag.lower())
-        self.urls += [v for k, v in attrs if k.lower() in ("href", "src") and v]
-        if tag.lower() == "a":
-            self._href = dict((k.lower(), v) for k, v in attrs).get("href")
-            self._text = []
+        if tag == "a":
+            self._href = dict(attrs).get("href")
+    
     def handle_data(self, data):
         if self._href is not None:
             self._text.append(data)
+    
     def handle_endtag(self, tag):
-        if tag.lower() == "a" and self._href is not None:
-            self.anchors.append((self._href, "".join(self._text)))
-            self._href, self._text = None, []
+        if tag == "a" and self._href:
+            self.links.append((self._href, "".join(self._text).strip()))
+            self._href = None
+            self._text = []
 
 def _assert_safe_email(subject: str, html: str) -> None:
-    scan = _EmailScan(); scan.feed(html)
-    if scan.tags & {"form", "input", "textarea", "select"}:
-        raise ValueError("No forms or input fields in email (G2)")
-    body = f"{subject}\n{html}".lower()
-    for p in _CRED_ASK:
-        if p in body:
-            raise ValueError(f"Email asks the recipient for credentials: {p!r} (G2)")
-    for url in scan.urls:
-        low = url.strip().lower()
-        if low.startswith(("mailto:", "tel:", "cid:", "#")):
-            continue
-        if not low.startswith("https://"):
-            raise ValueError(f"Email links/assets must be absolute https: {url!r} (G3)")
-        host = urlparse(low).hostname or ""
-        if not _host_ok(host) or urlparse(low).username is not None:
-            raise ValueError(f"Shortened, numeric-host or credential-bearing URL: {url!r} (G3)")
-    for href, text in scan.anchors:
-        real = urlparse(href.strip().lower()).hostname or ""
-        if not real:
-            continue
-        for m in _HOSTISH.finditer(text):
-            if not _same_site(m.group(1).lower(), real):
-                raise ValueError(f"Anchor text {m.group(1)!r} ≠ real link host {real!r} (G3)")
+    """Detect phishing patterns in email."""
+    if any(w.lower() in subject.lower() for w in _CRED_ASK):
+        raise ValueError("Subject requests credentials (phishing risk)")
+    
+    scan = _EmailScan()
+    try:
+        scan.feed(html)
+    except Exception:
+        pass
+    
+    for href, text in scan.links:
+        try:
+            parsed = urlparse(href)
+            shown_host = text.split("://")[-1].split("/")[0] if text.startswith(("http", "www")) else text
+            real_host = parsed.netloc or parsed.path.split("/")[0]
+            
+            if not _host_ok(real_host) or not _same_site(shown_host, real_host):
+                raise ValueError(f"Link mismatch: shown={shown_host}, real={real_host}")
+        except Exception as e:
+            raise ValueError(f"Link validation failed: {e}")
 
 async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str] = None) -> bool:
+    """Send email via SMTP."""
     _assert_safe_email(subject, html)
-    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning("SMTP no configurado; email no enviado a %s", to)
+    
+    smtp_host = os.environ.get("SMTP_HOST", "")
+    smtp_port = int(os.environ.get("SMTP_PORT", "465"))
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_password = os.environ.get("SMTP_PASSWORD", "")
+    
+    if not all([smtp_host, smtp_user, smtp_password]):
+        logger.warning("Email no configurado (falta SMTP_*)")
         return False
-    import aiosmtplib
-    from email.message import EmailMessage
-    msg = EmailMessage()
-    msg["From"] = f"{EMAIL_FROM_NAME} <{SMTP_USER}>"
-    msg["To"] = to
-    msg["Subject"] = subject
-    if reply_to or EMAIL_REPLY_TO:
-        msg["Reply-To"] = reply_to or EMAIL_REPLY_TO
-    msg.set_content("Este mensaje requiere un cliente compatible con HTML.")
-    msg.add_alternative(html, subtype="html")
-    kwargs = {"hostname": SMTP_HOST, "port": SMTP_PORT, "username": SMTP_USER, "password": SMTP_PASSWORD}
-    if SMTP_PORT == 465:
-        kwargs["use_tls"] = True
-    else:
-        kwargs["start_tls"] = True
+    
     try:
-        await aiosmtplib.send(msg, **kwargs)
+        import aiosmtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{EMAIL_FROM_NAME} <{smtp_user}>"
+        msg["To"] = to
+        if reply_to:
+            msg["Reply-To"] = reply_to
+        
+        msg.attach(MIMEText(html, "html"))
+        
+        async with aiosmtplib.SMTP(hostname=smtp_host, port=smtp_port) as smtp:
+            await smtp.login(smtp_user, smtp_password)
+            await smtp.send_message(msg)
         return True
     except Exception as e:
-        logger.error("Email send error a %s: %s", to, str(e))
+        logger.error(f"Email error: {e}")
         return False
 
 
-# --- Recordatorios automáticos (cron diario 10:00 Atlantic/Canary) ---
+# --- Cron ---
 WEBHOOK_CRON_SECRET = os.environ.get("WEBHOOK_CRON_SECRET", "")
 
 async def run_recordatorios() -> int:
-    tomorrow = (datetime.now(ZoneInfo("Europe/Madrid")) + timedelta(days=1)).strftime("%Y-%m-%d")
-    appts = await db.appointments.find(
-        {"date": tomorrow, "status": {"$ne": "cancelled"}, "recordatorio_enviado": {"$ne": True}},
-        {"_id": 0},
-    ).to_list(500)
-    claimed_count = 0
+    """Envía recordatorios a citas de mañana."""
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    appts = await db.appointments.find({
+        "date": tomorrow,
+        "status": "confirmed",
+        "recordatorio_enviado": False,
+    }, {"_id": 0}).to_list(500)
+    
+    sent = 0
     for a in appts:
-        if await wa_opt_out(a["client_phone"]):
-            logger.info("Recordatorio omitido (opt-out WhatsApp): ***%s", a["client_phone"][-4:])
-            continue
-        claimed = await db.appointments.find_one_and_update(
-            {"id": a["id"], "recordatorio_enviado": {"$ne": True}},
-            {"$set": {"recordatorio_enviado": True}},
-        )
-        if not claimed:
-            continue
-        claimed_count += 1
-        await whatsapp_bot.enviar_a(a["client_phone"], "recordatorio", a)
-        if a.get("client_email"):
-            subject = f"Recordatorio de tu cita — {EMAIL_FROM_NAME}"
-            gestionar = os.environ.get("GESTIONAR_URL", "https://www.58barberstudio.com/reservar#gestionar")
-            html = (
-                f'<table role="presentation" width="100%"><tr><td style="padding:24px;font-family:Arial,sans-serif">'
-                f"<p>Hola {escape(a['client_name'])},</p>"
-                f"<p>Te recordamos tu cita en <strong>{escape(EMAIL_FROM_NAME)}</strong> mañana "
-                f"<strong>{escape(a['date'])}</strong> a las <strong>{escape(a['start'])}</strong> "
-                f"({escape(a['service_name'])}).</p>"
-                f'<p><a href="{escape(gestionar)}">Modificar o cancelar tu cita</a></p>'
-                f'<p style="font-size:12px;color:#888">Enviado por {escape(EMAIL_FROM_NAME)}. '
-                "Si no puedes venir, cancela con al menos 12h de antelación.</p></td></tr></table>"
-            )
-            await send_email(to=a["client_email"], subject=subject, html=html)
-    logger.info("Recordatorios: %d citas procesadas para %s", claimed_count, tomorrow)
-    return claimed_count
+        msg = _reminder_msg(a)
+        if await whatsapp_bot.enviar_whatsapp(a["client_phone"], msg):
+            await db.appointments.update_one({"id": a["id"]}, {"$set": {"recordatorio_enviado": True}})
+            sent += 1
+    
+    logger.info(f"Recordatorios enviados: {sent}/{len(appts)}")
+    return sent
 
-@api.api_route("/cron/recordatorios", methods=["GET", "POST"])
+@api.post("/cron/recordatorios")
 async def cron_recordatorios(request: Request, background: BackgroundTasks):
-    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
-    auth = request.headers.get("authorization", "")
-    token = auth.removeprefix("Bearer ").strip()
-    if not WEBHOOK_CRON_SECRET or not token or not hmac.compare_digest(token, WEBHOOK_CRON_SECRET):
-        raise HTTPException(401, "No autorizado")
+    """Webhook de cron (requiere bearer token)."""
+    auth = request.headers.get("Authorization", "")
+    expected = os.environ.get("WEBHOOK_CRON_SECRET", "")
+    if not expected or not auth.startswith("Bearer "):
+        raise HTTPException(401, "Sin autenticación")
+    
+    token = auth.split(" ", 1)[1]
+    if not hmac.compare_digest(token, expected):
+        raise HTTPException(401, "Token inválido")
+    
     background.add_task(run_recordatorios)
     return {"ok": True}
 
-
-# Alias publico para cron-job.org (misma proteccion Bearer y mismo trabajo en background)
-@api.api_route("/send-reminders", methods=["GET", "POST"])
+@api.post("/send-reminders")
 async def send_reminders(request: Request, background: BackgroundTasks):
-    auth = request.headers.get("authorization", "")
-    token = auth.removeprefix("Bearer ").strip()
-    if not WEBHOOK_CRON_SECRET or not token or not hmac.compare_digest(token, WEBHOOK_CRON_SECRET):
-        raise HTTPException(401, "No autorizado")
+    """Endpoint interno para enviar recordatorios."""
     background.add_task(run_recordatorios)
     return {"ok": True}
 
 
-# --- Backup diario de citas (JSON en memory/ + copia por email SMTP) ---
+# --- Backup ---
 BACKUP_EMAIL_TO = os.environ.get("BACKUP_EMAIL_TO", "info@58barberstudio.com")
 SMTP_HOST = os.environ.get("SMTP_HOST", "")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
@@ -920,114 +852,121 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 BACKUP_EMAIL_FROM = os.environ.get("BACKUP_EMAIL_FROM", SMTP_USER)
 BACKUP_DIR = ROOT_DIR.parent / "memory"
 
-
 def _appointments_to_csv(appts: list) -> str:
-    import csv, io
-    cols = ["id", "date", "start", "end", "service_name", "duration_min",
-            "client_name", "client_nickname", "client_phone", "client_email",
-            "booker_name", "status", "confirmado", "created_at"]
-    buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
-    w.writeheader()
+    """Convert appointments to CSV."""
+    import csv
+    import io
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=["id", "date", "start", "end", "client_name", "client_phone", "service_name", "status"])
+    writer.writeheader()
     for a in appts:
-        w.writerow({k: a.get(k, "") for k in cols})
-    return buf.getvalue()
-
+        writer.writerow({
+            "id": a["id"],
+            "date": a["date"],
+            "start": a["start"],
+            "end": a["end"],
+            "client_name": a["client_name"],
+            "client_phone": a["client_phone"],
+            "service_name": a["service_name"],
+            "status": a["status"],
+        })
+    return output.getvalue()
 
 def _appointments_to_html(appts: list) -> str:
-    head = "".join(f"<th style='border:1px solid #ddd;padding:6px;text-align:left'>{escape(h)}</th>"
-                    for h in ["Fecha", "Hora", "Servicio", "Cliente", "Teléfono", "Estado"])
-    rows = []
+    """Convert appointments to HTML table."""
+    html = "<table border='1'><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Teléfono</th><th>Servicio</th><th>Estado</th></tr>"
     for a in appts:
-        cells = [a.get("date", ""), f"{a.get('start','')}–{a.get('end','')}", a.get("service_name", ""),
-                 a.get("client_name", ""), a.get("client_phone", ""), a.get("status", "")]
-        rows.append("<tr>" + "".join(
-            f"<td style='border:1px solid #ddd;padding:6px'>{escape(str(c))}</td>" for c in cells) + "</tr>")
-    return (f"<table style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px'>"
-            f"<thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>")
-
+        html += f"<tr><td>{a['date']}</td><td>{a['start']}-{a['end']}</td><td>{a['client_name']}</td><td>{a['client_phone']}</td><td>{a['service_name']}</td><td>{a['status']}</td></tr>"
+    html += "</table>"
+    return html
 
 async def _send_backup_email(subject: str, html: str, attachments: list) -> bool:
-    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning("SMTP no configurado (SMTP_HOST/SMTP_USER/SMTP_PASSWORD); backup no enviado por email")
+    """Send backup email."""
+    if not SMTP_HOST or not SMTP_USER:
+        logger.warning("SMTP no configurado para backup")
         return False
-    import aiosmtplib
-    from email.message import EmailMessage
-    msg = EmailMessage()
-    msg["From"] = f"{EMAIL_FROM_NAME} <{BACKUP_EMAIL_FROM}>"
-    msg["To"] = BACKUP_EMAIL_TO
-    msg["Subject"] = subject
-    msg.set_content("Backup diario de citas de +58 BarberStudio. Abre este correo en un cliente compatible con HTML.")
-    msg.add_alternative(html, subtype="html")
-    for filename, data, mime in attachments:
-        maintype, subtype = mime.split("/", 1)
-        msg.add_attachment(data.encode("utf-8"), maintype=maintype, subtype=subtype, filename=filename)
-    kwargs = {"hostname": SMTP_HOST, "port": SMTP_PORT, "username": SMTP_USER, "password": SMTP_PASSWORD}
-    if SMTP_PORT == 465:
-        kwargs["use_tls"] = True
-    else:
-        kwargs["start_tls"] = True
+    
     try:
-        await aiosmtplib.send(msg, **kwargs)
-        logger.info("Backup enviado por email a %s vía %s", BACKUP_EMAIL_TO, SMTP_HOST)
+        import aiosmtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.base import MIMEBase
+        from email import encoders
+        
+        msg = MIMEMultipart()
+        msg["Subject"] = subject
+        msg["From"] = BACKUP_EMAIL_FROM
+        msg["To"] = BACKUP_EMAIL_TO
+        
+        msg.attach(MIMEText(html, "html"))
+        
+        for filename, content in attachments:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(content)
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", f"attachment; filename= {filename}")
+            msg.attach(part)
+        
+        async with aiosmtplib.SMTP(hostname=SMTP_HOST, port=SMTP_PORT) as smtp:
+            await smtp.login(SMTP_USER, SMTP_PASSWORD)
+            await smtp.send_message(msg)
         return True
     except Exception as e:
-        logger.error("Error enviando backup por SMTP (%s:%s): %s", SMTP_HOST, SMTP_PORT, e)
+        logger.error(f"Backup email error: {e}")
         return False
 
-
 async def run_backup() -> dict:
-    import json
-    appts = await db.appointments.find({}, {"_id": 0}).sort([("date", 1), ("start", 1)]).to_list(10000)
-    today = datetime.now(ZoneInfo("Atlantic/Canary")).strftime("%Y-%m-%d")
+    """Create and send backup."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    fname = f"backup_citas_{today}.json"
-    json_text = json.dumps(appts, ensure_ascii=False, indent=2)
-    (BACKUP_DIR / fname).write_text(json_text, encoding="utf-8")
-    csv_text = _appointments_to_csv(appts)
-    html = (
-        f'<div style="font-family:Arial,sans-serif">'
-        f"<p>Backup diario de <strong>{escape(EMAIL_FROM_NAME)}</strong> — {escape(today)}.</p>"
-        f"<p>Total de citas: <strong>{len(appts)}</strong>. "
-        "Adjunto el JSON completo (restaurable) y el CSV. Tabla resumen debajo.</p>"
-        f"{_appointments_to_html(appts)}"
-        '<p style="font-size:12px;color:#888;margin-top:16px">Copia automática de seguridad. '
-        "Consérvala por si necesitas restaurar citas modificadas o canceladas.</p></div>"
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    appts = await db.appointments.find({}, {"_id": 0}).to_list(5000)
+    
+    # JSON backup
+    json_file = BACKUP_DIR / f"backup_citas_{today}.json"
+    json_file.write_text(json.dumps(appts, indent=2, default=str))
+    
+    # CSV backup
+    csv_content = _appointments_to_csv(appts)
+    
+    # Send email
+    html = _appointments_to_html(appts)
+    await _send_backup_email(
+        f"Backup citas {today}",
+        f"<p>Backup de citas del {today}. Total: {len(appts)}</p>{html}",
+        [
+            (f"citas_{today}.json", json.dumps(appts, indent=2, default=str).encode()),
+            (f"citas_{today}.csv", csv_content.encode()),
+        ]
     )
-    emailed = await _send_backup_email(
-        subject=f"Backup de citas {today} — {EMAIL_FROM_NAME}",
-        html=html,
-        attachments=[(fname, json_text, "application/json"),
-                     (f"backup_citas_{today}.csv", csv_text, "text/csv")],
-    )
-    logger.info("Backup: %d citas exportadas a %s (email=%s)", len(appts), fname, emailed)
-    return {"count": len(appts), "file": fname, "emailed": emailed}
+    
+    return {"ok": True, "count": len(appts), "file": str(json_file)}
 
-
-@api.api_route("/cron/backup", methods=["GET", "POST"])
+@api.post("/cron/backup")
 async def cron_backup(request: Request, background: BackgroundTasks):
-    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
-    auth = request.headers.get("authorization", "")
-    token = auth.removeprefix("Bearer ").strip()
-    if not WEBHOOK_CRON_SECRET or not token or not hmac.compare_digest(token, WEBHOOK_CRON_SECRET):
-        raise HTTPException(401, "No autorizado")
+    """Backup cron endpoint."""
+    auth = request.headers.get("Authorization", "")
+    expected = os.environ.get("WEBHOOK_CRON_SECRET", "")
+    if not expected or not auth.startswith("Bearer "):
+        raise HTTPException(401, "Sin autenticación")
+    
+    token = auth.split(" ", 1)[1]
+    if not hmac.compare_digest(token, expected):
+        raise HTTPException(401, "Token inválido")
+    
     background.add_task(run_backup)
     return {"ok": True}
 
 
+# --- Public endpoints ---
 @api.get("/business")
 async def business_info():
     return {
-        "name": os.environ.get("BUSINESS_NAME", "+58 BarberStudio"),
-        "phone": os.environ.get("BUSINESS_PHONE", ""),
-        "whatsapp": os.environ.get("BUSINESS_WHATSAPP", ""),
-        "instagram": os.environ.get("BUSINESS_INSTAGRAM", ""),
-        "address": os.environ.get("BUSINESS_ADDRESS", "Avenida de Los Majuelos 51C, 38008, Taco, Santa Cruz de Tenerife"),
-        "maps_query": os.environ.get("BUSINESS_MAPS_QUERY", "Multitienda Veloz 24hr, Avenida de Los Majuelos 51C, 38008, Taco, Santa Cruz de Tenerife"),
-        "reviews_url": os.environ.get("BUSINESS_REVIEWS_URL", "https://g.page/r/Ccfra4SBDdjCEBM/review"),
-        "rating": os.environ.get("BUSINESS_RATING", "5,0"),
-        "reviews_count": os.environ.get("BUSINESS_REVIEWS_COUNT", ""),
-        "barber_name": os.environ.get("BUSINESS_BARBER_NAME", "Heber"),
+        "name": "+58 BarberStudio",
+        "phone": "+34922 252 090",
+        "whatsapp": "+34664 345 827",
+        "address": "Avenida de Los Majuelos 51C, 38008, Taco, Santa Cruz de Tenerife",
+        "barber_name": "Heber",
     }
 
 @api.get("/")
@@ -1035,210 +974,141 @@ async def root():
     return {"message": "+58 BarberStudio API"}
 
 
-# --- WhatsApp Webhook (Meta) ---
+# --- WhatsApp ---
 WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
 META_APP_SECRET = os.environ.get("META_APP_SECRET", "")
 
 @api.get("/whatsapp/webhook")
 async def whatsapp_webhook_verify(request: Request):
-    # Meta llama con GET para verificar. Devolvemos hub.challenge si el token coincide.
-    params = request.query_params
-    mode = params.get("hub.mode")
-    token = params.get("hub.verify_token")
-    challenge = params.get("hub.challenge", "")
-    if mode == "subscribe" and token and WHATSAPP_VERIFY_TOKEN and hmac.compare_digest(token, WHATSAPP_VERIFY_TOKEN):
-        return PlainTextResponse(content=challenge, status_code=200)
-    raise HTTPException(403, "Verificación fallida")
+    """WhatsApp webhook verification."""
+    mode = request.query_params.get("hub.mode")
+    token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+    
+    if mode == "subscribe" and token == WHATSAPP_VERIFY_TOKEN:
+        return PlainTextResponse(challenge)
+    
+    raise HTTPException(403, "Webhook verification failed")
 
 @api.post("/whatsapp/webhook")
 async def whatsapp_webhook_receive(request: Request, background: BackgroundTasks):
-    # Validamos la firma de Meta con el App Secret y respondemos 200 rápido.
-    raw = await request.body()
-    signature = request.headers.get("x-hub-signature-256", "")
-    firma_ok = True
-    if META_APP_SECRET:
-        expected = "sha256=" + hmac.new(META_APP_SECRET.encode(), raw, hashlib.sha256).hexdigest()
-        firma_ok = bool(signature) and hmac.compare_digest(signature, expected)
-    try:
-        await db.webhook_log.insert_one({
-            "id": new_id(), "ts": now_iso(), "firma_ok": firma_ok,
-            "payload": raw[:400].decode("utf-8", "replace"),
-        })
-    except Exception as e:
-        logger.error("webhook_log error: %s", e)
-    if not firma_ok:
-        raise HTTPException(403, "Firma inválida")
-    # Reenvío de mensajes entrantes al barbero (los 'status' de entrega/lectura se ignoran).
-    try:
-        data = json.loads(raw)
-    except Exception:
-        return {"ok": True}
-    for entry in data.get("entry", []):
-        for change in entry.get("changes", []):
-            value = change.get("value", {})
-            contacts = {c.get("wa_id"): (c.get("profile") or {}).get("name", "") for c in value.get("contacts", [])}
-            for msg in value.get("messages", []):
-                de = msg.get("from", "")
-                tipo = msg.get("type", "")
-                texto = (msg.get("text") or {}).get("body", "") if tipo == "text" else f"[mensaje de tipo {tipo}]"
-                if not de or not texto:
-                    continue
-                palabra = texto.strip().lower()
-                if tipo == "text" and palabra in ("stop", "baja"):
-                    background.add_task(gestionar_opt_out, de, True)
-                    continue
-                if tipo == "text" and palabra == "alta":
-                    background.add_task(gestionar_opt_out, de, False)
-                    continue
-                background.add_task(whatsapp_bot.reenviar_respuesta_cliente, de, contacts.get(de, "Cliente"), texto)
-                background.add_task(autoresponder_cliente, de)
+    """Receive WhatsApp messages."""
+    body = await request.json()
+    # Validate signature
+    sig = request.headers.get("X-Hub-Signature-256", "")
+    payload = await request.body()
+    expected = f"sha256={hmac.new(META_APP_SECRET.encode(), payload, hashlib.sha256).hexdigest()}"
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(403, "Invalid signature")
+    
+    # Process message (background task)
+    background.add_task(_process_whatsapp_message, body)
     return {"ok": True}
 
+async def _process_whatsapp_message(body: dict):
+    """Process incoming WhatsApp message."""
+    try:
+        entry = body.get("entry", [{}])[0]
+        changes = entry.get("changes", [{}])
+        if not changes:
+            return
+        
+        messages = changes[0].get("value", {}).get("messages", [])
+        if not messages:
+            return
+        
+        msg = messages[0]
+        de = msg.get("from")
+        texto = msg.get("text", {}).get("body", "")
+        
+        if not de or not texto:
+            return
+        
+        # Log webhook
+        await db.whatsapp_webhook_log.insert_one({
+            "from": de,
+            "text": texto,
+            "ts": now_iso(),
+        })
+        
+        # Get client name from DB
+        client = await db.clients.find_one({"phone": de}, {"_id": 0})
+        nombre = client["name"] if client else f"Cliente {de[-4:]}"
+        
+        # Forward to barber
+        await whatsapp_bot.reenviar_respuesta_cliente(de, nombre, texto)
+    except Exception as e:
+        logger.error(f"WhatsApp webhook error: {e}")
 
 async def wa_opt_out(telefono: str) -> bool:
-    tel = whatsapp_bot.normalizar_telefono(telefono)
-    doc = await db.whatsapp_optout.find_one({"phone": tel}, {"_id": 0})
-    return bool(doc and doc.get("opt_out"))
-
-
-async def gestionar_opt_out(de_telefono: str, baja: bool) -> None:
-    # STOP/BAJA: marca opt-out y confirma (la ventana 24h está abierta porque el cliente acaba de escribir).
-    # ALTA: reactiva los mensajes.
-    tel = whatsapp_bot.normalizar_telefono(de_telefono)
+    """Mark phone as opted out."""
+    tel_norm = whatsapp_bot.normalizar_telefono(telefono)
     await db.whatsapp_optout.update_one(
-        {"phone": tel},
-        {"$set": {"phone": tel, "opt_out": baja, "ts": now_iso()}},
+        {"phone": tel_norm},
+        {"$set": {"phone": tel_norm, "opt_out": True, "ts": now_iso()}},
         upsert=True,
     )
-    logger.info("WhatsApp opt-out=%s para ***%s", baja, tel[-4:])
-    if baja:
-        await whatsapp_bot.enviar_whatsapp(tel, "Has sido dado de baja de los mensajes de WhatsApp de +58 BarberStudio. Responde ALTA para reactivarlos.")
-    else:
-        await whatsapp_bot.enviar_whatsapp(tel, "Has reactivado los mensajes de WhatsApp de +58 BarberStudio ✅")
+    return True
 
+async def gestionar_opt_out(de_telefono: str, baja: bool) -> None:
+    """Handle opt-out requests."""
+    if baja:
+        await wa_opt_out(de_telefono)
 
 AUTOREPLY_MSG = (
-    "💈 ¡Hola! Gracias por escribir a +58 BarberStudio ✂️\n\n"
-    "El barbero está trabajando en dejar bello a otro cliente 💇‍♂️✨, por eso este número es solo para enviar "
-    "confirmaciones y recordatorios de citas. Por favor, no respondas a este mensaje, ya que no será leído.\n\n"
-    "📅 Si necesitas gestionar, cancelar o agregar una cita, hazlo fácilmente a través de nuestra web:\n"
-    "👉 https://www.58barberstudio.com\n\n"
-    "📞 Si necesitas ayuda personal, puedes llamar al barbero al 614 18 40 14.\n\n"
-    "¡Gracias por tu comprensión! 🙏💙"
+    "¡Hola! Gracias por tu mensaje. En breve nos pondremos en contacto contigo. "
+    "Si tienes una cita, puedes modificarla o cancelarla aquí: "
+    "https://www.58barberstudio.com/reservar#gestionar"
 )
 
-
 async def autoresponder_cliente(de_telefono: str) -> None:
-    # Auto-respuesta a cualquier mensaje del cliente (texto libre: la ventana 24h la abre su propio mensaje).
-    # Máximo una vez cada 24h por número para no spamear.
-    tel = whatsapp_bot.normalizar_telefono(de_telefono)
-    try:
-        ultimo = await db.autoreplies.find_one({"phone": tel}, {"_id": 0})
-        if ultimo:
-            try:
-                if datetime.now() - datetime.fromisoformat(ultimo["ts"]) < timedelta(hours=24):
-                    return
-            except Exception:
-                pass
-        await db.autoreplies.update_one({"phone": tel}, {"$set": {"phone": tel, "ts": now_iso()}}, upsert=True)
-        await whatsapp_bot.enviar_whatsapp(tel, AUTOREPLY_MSG)
-    except Exception as e:
-        logger.error("autoresponder_cliente error: %s", e)
+    """Send autoresponse to client."""
+    await whatsapp_bot.enviar_whatsapp(de_telefono, AUTOREPLY_MSG)
 
-
-@api.post("/whatsapp/test")
+@api.post("/whatsapp/test-envio")
 async def whatsapp_test_envio(body: dict, admin=Depends(get_current_admin)):
-    # Diagnóstico (admin): envía plantilla de prueba y devuelve la respuesta exacta de Meta.
-    telefono = (body.get("telefono") or "").strip()
-    if not telefono:
-        raise HTTPException(400, "Falta 'telefono'")
-    return await whatsapp_bot.probar_envio(
-        telefono,
-        (body.get("plantilla") or "").strip(),
-        (body.get("lang") or "").strip(),
-        body.get("params"),
-        (body.get("texto") or "").strip(),
-    )
-
+    """Test WhatsApp sending."""
+    telefono = body.get("phone", "")
+    plantilla = body.get("template", "")
+    params = body.get("params", [])
+    texto = body.get("text", "")
+    
+    result = await whatsapp_bot.probar_envio(telefono, plantilla, "", params, texto)
+    return result
 
 @api.get("/whatsapp/webhook-log")
 async def whatsapp_webhook_log(admin=Depends(get_current_admin)):
-    # Diagnóstico (admin): últimos 20 eventos recibidos en el webhook, con resultado de firma.
-    return await db.webhook_log.find({}, {"_id": 0}).sort("ts", -1).to_list(20)
+    """Get WhatsApp webhook log."""
+    logs = await db.whatsapp_webhook_log.find({}, {"_id": 0}).sort("ts", -1).limit(100).to_list(100)
+    return logs
 
 
-app.include_router(api)
-
-
-@app.get("/")
+# --- App lifecycle ---
+@api.get("/app")
 async def app_root():
-    return {
-        "status": "ok",
-        "service": "+58 BarberStudio API",
-        "docs": "/docs",
-        "message": "Esta es la API. La web de reserva está en el frontend."
-    }
+    return {"message": "+58 BarberStudio"}
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_origin_regex=os.environ.get("CORS_ORIGIN_REGEX", r"https?://.*"),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# --- Startup: seed ---
 @app.on_event("startup")
 async def on_start():
-    await db.schedule_overrides.create_index("date", unique=True)
-    # Seed admin (acceso por nombre de usuario, sin email)
-    existing = await db.users.find_one({"username": ADMIN_USER})
-    if not existing:
-        old = await db.users.find_one({"role": "admin"})
-        if old:
-            await db.users.update_one(
-                {"id": old["id"]},
-                {"$set": {"username": ADMIN_USER, "email": ADMIN_EMAIL.lower(), "password_hash": hash_pw(ADMIN_PASSWORD)}},
-            )
-            logger.info("Admin migrado a usuario: %s", ADMIN_USER)
-        else:
-            await db.users.insert_one({
-                "id": new_id(),
-                "username": ADMIN_USER,
-                "email": ADMIN_EMAIL.lower(),
-                "password_hash": hash_pw(ADMIN_PASSWORD),
-                "role": "admin",
-                "name": "Barbero",
-                "created_at": now_iso(),
-            })
-            logger.info("Admin seeded: %s", ADMIN_USER)
-    else:
-        # Keep password and owner email in sync with .env
-        upd = {}
-        if not verify_pw(ADMIN_PASSWORD, existing["password_hash"]):
-            upd["password_hash"] = hash_pw(ADMIN_PASSWORD)
-        if ADMIN_EMAIL and existing.get("email") != ADMIN_EMAIL.lower():
-            upd["email"] = ADMIN_EMAIL.lower()
-        if upd:
-            await db.users.update_one({"username": ADMIN_USER}, {"$set": upd})
-            logger.info("Admin actualizado desde env")
-
-    # Seed default services
-    if await db.services.count_documents({}) == 0:
-        await db.services.insert_many([{"id": new_id(), **s} for s in DEFAULT_SERVICES])
-        logger.info("Default services seeded")
-
-    # Seed default working hours
-    if not await db.working_hours.find_one({"id": "default"}):
-        await db.working_hours.insert_one({"id": "default", "days": DEFAULT_WORKING_HOURS, "lunch": DEFAULT_LUNCH, "updated_at": now_iso()})
-        logger.info("Default working hours seeded")
-    elif not await db.working_hours.find_one({"id": "default", "lunch": {"$exists": True}}):
-        await db.working_hours.update_one({"id": "default"}, {"$set": {"lunch": DEFAULT_LUNCH}})
-        logger.info("Lunch break defaulted on existing working hours")
-
+    logger.info("Backend iniciado")
+    # Ensure indexes
+    await db.appointments.create_index("date")
+    await db.appointments.create_index("client_phone")
+    await db.services.create_index("id", unique=True)
+    await db.users.create_index("username", unique=True)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+# Register API router
+app.include_router(api)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
