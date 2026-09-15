@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { format, addDays, startOfWeek, addMinutes, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Scissors, LogOut, Calendar as CalIcon, Users, Settings, Ban, Plus, Trash2, Edit, X, ChevronLeft, ChevronRight, Phone, Clock } from "lucide-react";
+import { Scissors, LogOut, Calendar as CalIcon, Users, Settings, Ban, Plus, Trash2, Edit, X, ChevronLeft, ChevronRight, Phone, Clock, Coffee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -349,6 +349,8 @@ function ServicesPanel() {
 /* ---------------- Schedule ---------------- */
 function SchedulePanel() {
   const [days, setDays] = useState(null);
+  const [lunch, setLunch] = useState({ enabled: true, start: "13:00", end: "14:00" });
+  const [lunchSaving, setLunchSaving] = useState(false);
 
   // Excepciones por fecha
   const [month, setMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
@@ -358,7 +360,28 @@ function SchedulePanel() {
   const [ovrExists, setOvrExists] = useState(false);
   const [ovrSaving, setOvrSaving] = useState(false);
 
-  useEffect(() => { api.get("/working-hours").then((r) => setDays(r.data.days)); }, []);
+  useEffect(() => {
+    api.get("/working-hours").then((r) => {
+      setDays(r.data.days);
+      if (r.data.lunch) setLunch(r.data.lunch);
+    });
+  }, []);
+
+  const saveLunch = async (next) => {
+    const payload = next || lunch;
+    setLunchSaving(true);
+    try {
+      await api.put("/lunch-break", payload);
+      toast.success(payload.enabled ? "Descanso de almuerzo activado" : "Descanso de almuerzo desactivado");
+    } catch (e) { toast.error(formatErr(e)); }
+    setLunchSaving(false);
+  };
+
+  const toggleLunch = (v) => {
+    const next = { ...lunch, enabled: v };
+    setLunch(next);
+    saveLunch(next);
+  };
 
   const loadOverrides = () => {
     const from = format(month, "yyyy-MM-dd");
@@ -459,6 +482,39 @@ function SchedulePanel() {
           })}
         </div>
         <Button data-testid="sched-save" onClick={save} className="mt-6 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A]">Guardar horario base</Button>
+
+        {/* Descanso de almuerzo */}
+        <div className="mt-8 max-w-2xl bg-[#1A1A1E] border border-[#2A2A32] rounded-lg p-5" data-testid="lunch-break-card">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h3 className="font-display text-lg tracking-tight flex items-center gap-2">
+                <Coffee className="h-4 w-4 text-[#D4B77A]" /> Descanso de almuerzo
+              </h3>
+              <p className="text-sm text-neutral-400 mt-1 max-w-md">
+                Bloquea esta franja todos los días. Apágalo si quieres atender a algún cliente durante el almuerzo.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm ${lunch.enabled ? "text-[#D4B77A]" : "text-neutral-500"}`}>
+                {lunch.enabled ? "Activado" : "Apagado"}
+              </span>
+              <Switch data-testid="lunch-enabled" checked={lunch.enabled} onCheckedChange={toggleLunch} />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Input data-testid="lunch-start" type="time" value={lunch.start} disabled={!lunch.enabled}
+              onChange={(e) => setLunch({ ...lunch, start: e.target.value })}
+              className="w-32 bg-[#14141A] border-[#2A2A32]" />
+            <span className="text-neutral-500">–</span>
+            <Input data-testid="lunch-end" type="time" value={lunch.end} disabled={!lunch.enabled}
+              onChange={(e) => setLunch({ ...lunch, end: e.target.value })}
+              className="w-32 bg-[#14141A] border-[#2A2A32]" />
+            <Button data-testid="lunch-save" onClick={() => saveLunch()} disabled={lunchSaving || !lunch.enabled}
+              variant="outline" className="border-white/10 bg-transparent">
+              Guardar franja
+            </Button>
+          </div>
+        </div>
       </section>
 
       {/* Sección B: Excepciones por fecha */}

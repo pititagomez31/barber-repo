@@ -111,6 +111,11 @@ class WorkingHoursIn(BaseModel):
     # 0=Mon ... 6=Sun; each day: {enabled, start "HH:MM", end "HH:MM"}
     days: dict
 
+class LunchBreakIn(BaseModel):
+    enabled: bool = True
+    start: str = "13:00"   # "HH:MM"
+    end: str = "14:00"
+
 class BlockerIn(BaseModel):
     date: str          # "YYYY-MM-DD"
     start: Optional[str] = None  # "HH:MM" - if null: whole day
@@ -180,6 +185,8 @@ DEFAULT_WORKING_HOURS = {
     "6": {"enabled": False, "start": "10:00", "end": "14:00"},  # Sun
 }
 
+DEFAULT_LUNCH = {"enabled": True, "start": "13:00", "end": "14:00"}
+
 DEFAULT_SERVICES = [
     {"name": "Solo Corte", "description": "", "price_eur": 0.0, "duration_min": 35, "active": True},
     {"name": "Corte y Barba", "description": "", "price_eur": 0.0, "duration_min": 50, "active": True},
@@ -237,8 +244,8 @@ async def delete_service(sid: str, admin=Depends(get_current_admin)):
 async def get_working_hours():
     doc = await db.working_hours.find_one({"id": "default"}, {"_id": 0})
     if not doc:
-        return {"days": DEFAULT_WORKING_HOURS}
-    return {"days": doc.get("days", DEFAULT_WORKING_HOURS)}
+        return {"days": DEFAULT_WORKING_HOURS, "lunch": DEFAULT_LUNCH}
+    return {"days": doc.get("days", DEFAULT_WORKING_HOURS), "lunch": doc.get("lunch", DEFAULT_LUNCH)}
 
 @api.put("/working-hours")
 async def set_working_hours(body: WorkingHoursIn, admin=Depends(get_current_admin)):
@@ -248,6 +255,16 @@ async def set_working_hours(body: WorkingHoursIn, admin=Depends(get_current_admi
         upsert=True,
     )
     return {"days": body.days}
+
+@api.put("/lunch-break")
+async def set_lunch_break(body: LunchBreakIn, admin=Depends(get_current_admin)):
+    lunch = body.model_dump()
+    await db.working_hours.update_one(
+        {"id": "default"},
+        {"$set": {"id": "default", "lunch": lunch, "updated_at": now_iso()}},
+        upsert=True,
+    )
+    return {"lunch": lunch}
 
 
 # --- Blockers ---
@@ -365,6 +382,12 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
         if not b.get("start") or not b.get("end"):
             return []  # full-day block
         busy.append((parse_hhmm(b["start"]), parse_hhmm(b["end"])))
+
+    # Descanso de almuerzo (se aplica todos los días si está activado)
+    wh_doc = await db.working_hours.find_one({"id": "default"}, {"_id": 0})
+    lunch = (wh_doc or {}).get("lunch", DEFAULT_LUNCH)
+    if lunch.get("enabled") and lunch.get("start") and lunch.get("end"):
+        busy.append((parse_hhmm(lunch["start"]), parse_hhmm(lunch["end"])))
 
     slots = []
     # If today, don't offer past slots (Europe/Madrid ~ UTC+1 winter; keep simple with local now)
@@ -1204,8 +1227,11 @@ async def on_start():
 
     # Seed default working hours
     if not await db.working_hours.find_one({"id": "default"}):
-        await db.working_hours.insert_one({"id": "default", "days": DEFAULT_WORKING_HOURS, "updated_at": now_iso()})
+        await db.working_hours.insert_one({"id": "default", "days": DEFAULT_WORKING_HOURS, "lunch": DEFAULT_LUNCH, "updated_at": now_iso()})
         logger.info("Default working hours seeded")
+    elif not await db.working_hours.find_one({"id": "default", "lunch": {"$exists": True}}):
+        await db.working_hours.update_one({"id": "default"}, {"$set": {"lunch": DEFAULT_LUNCH}})
+        logger.info("Lunch break defaulted on existing working hours")
 
 
 @app.on_event("shutdown")
