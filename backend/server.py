@@ -330,6 +330,8 @@ async def day_schedule(date: str):
 
 # --- Availability calculation ---
 SLOT_STEP = 15  # minutes granularity for booking
+MAX_BOOKING_START = 12 * 60 + 45  # 12:45 -> hora de inicio máxima, salvo el servicio de 60 min
+EXEMPT_DURATION_MIN = 60           # "Corte, Barba y Cejas" (60 min) no tiene tope de 12:45
 
 async def _effective_schedule(date_str: str) -> dict:
     """Horario efectivo de una fecha: la excepción manda sobre el horario semanal base."""
@@ -394,9 +396,12 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
     now = datetime.now()
     today_min = now.hour * 60 + now.minute if d == now.date() else -1
 
+    # Hora de inicio máxima: 12:45 salvo el servicio de 60 min (Corte, Barba y Cejas)
+    max_start = end_m if duration_min == EXEMPT_DURATION_MIN else min(end_m, MAX_BOOKING_START)
+
     t = start_m
     while t + duration_min <= end_m:
-        if t > today_min:
+        if today_min < t <= max_start:
             conflict = any(not (t + duration_min <= b0 or t >= b1) for (b0, b1) in busy)
             if not conflict:
                 slots.append(fmt_hhmm(t))
