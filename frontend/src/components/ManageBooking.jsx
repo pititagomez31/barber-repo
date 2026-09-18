@@ -73,7 +73,7 @@ export default function ManageBooking({ id = "gestionar", defaultOpen = false })
         <div className="px-4 pb-5 space-y-3">
           {!appt ? (
             <div className="space-y-3">
-              <Input data-testid="manage-code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="bg-[#14141A] border-[#2A2A32] h-12 font-mono" placeholder="Código de reserva (8 caracteres)" />
+              <Input data-testid="manage-code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="bg-[#14141A] border-[#2A2A32] h-12 font-mono" placeholder="Código de la reserva" />
               <Input data-testid="manage-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="bg-[#14141A] border-[#2A2A32] h-12" placeholder="Teléfono con el que reservaste" />
               <Button data-testid="manage-search" onClick={buscar} disabled={busy} className="w-full h-11 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold">
                 {busy ? "Buscando…" : "Buscar mi cita"}
@@ -89,8 +89,12 @@ export default function ManageBooking({ id = "gestionar", defaultOpen = false })
               </div>
               {mode !== "edit" ? (
                 <div className="flex gap-2">
-                  <Button data-testid="manage-edit-btn" onClick={() => setMode("edit")} variant="outline" className="flex-1 h-11 border-[#D4B77A]/40 bg-transparent text-[#D4B77A] hover:bg-[#D4B77A]/10">Cambiar día u hora</Button>
-                  <Button data-testid="manage-cancel-btn" onClick={cancelar} disabled={busy} variant="outline" className="flex-1 h-11 border-red-400/50 bg-transparent text-red-400 hover:bg-red-400/10">Cancelar cita</Button>
+                  <Button data-testid="manage-edit-btn" onClick={() => setMode("edit")} variant="outline" className="flex-1 h-11 border-[#D4B77A]/40 bg-transparent text-[#D4B77A] hover:bg-[#D4B77A]/10">
+                    Cambiar cita
+                  </Button>
+                  <Button data-testid="manage-cancel-btn" onClick={cancelar} disabled={busy} variant="outline" className="flex-1 h-11 border-red-400/50 bg-transparent text-red-400 hover:bg-red-400/10">
+                    Cancelar
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -105,7 +109,7 @@ export default function ManageBooking({ id = "gestionar", defaultOpen = false })
                     ) : (
                       <div className="grid grid-cols-4 gap-2">
                         {mSlots.map((t) => (
-                          <button key={t} data-testid={`manage-slot-${t}`} onClick={() => modificar(t)} disabled={busy} className="py-2.5 rounded-md border border-[#2A2A32] bg-[#14141A] text-sm hover:border-[#D4B77A]/50">
+                          <button key={t} data-testid={`manage-slot-${t}`} onClick={() => modificar(t)} disabled={busy} className="py-2.5 rounded-md border border-[#2A2A32] bg-[#14141A] text-sm hover:border-[#D4B77A]/60 hover:text-[#D4B77A] transition-colors disabled:opacity-50">
                             {t}
                           </button>
                         ))}
