@@ -35,7 +35,27 @@ async def _post_meta(payload: dict) -> bool:
         if resp.is_error:
             logger.error("WhatsApp API %s: %s", resp.status_code, resp.text[:300])
             return False
-        logger.info("WhatsApp enviado a ***%s", (payload.get("to") or "")[-4:])
+        # Meta puede devolver 200 sin que el mensaje llegue de verdad a encolarse.
+        # Registramos el cuerpo completo para poder ver message_status y detectar
+        # ese caso silencioso (200 OK pero sin "accepted").
+        try:
+            body = resp.json()
+        except Exception:
+            body = {"raw": resp.text[:300]}
+        msgs = body.get("messages", []) if isinstance(body, dict) else []
+        status = msgs[0].get("message_status") if msgs else None
+        logger.info(
+            "WhatsApp a ***%s | plantilla=%s | meta_status=%s | respuesta=%s",
+            (payload.get("to") or "")[-4:],
+            (payload.get("template") or {}).get("name", "(texto libre)"),
+            status,
+            body,
+        )
+        if status not in (None, "accepted"):
+            logger.warning(
+                "WhatsApp devolvió 200 pero message_status=%s (no aceptado) para ***%s",
+                status, (payload.get("to") or "")[-4:],
+            )
         return True
     except Exception as e:
         logger.error("WhatsApp request error: %s", e)
