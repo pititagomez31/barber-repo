@@ -30,7 +30,7 @@ export default function Booking() {
   const [slots, setSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [time, setTime] = useState("");
-  const [form, setForm] = useState({ name: "", nickname: "", phone: "", email: "", forOther: false, otherName: "", policy: false, whatsapp: false });
+  const [form, setForm] = useState({ name: "", nickname: "", phone: "", phone2: "", email: "", forOther: false, otherName: "", policy: false, whatsapp: false });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null); // array de citas creadas
 
@@ -128,6 +128,8 @@ export default function Booking() {
 
   const submit = async () => {
     if (!form.name.trim() || !form.phone.trim()) return toast.error("Rellena tu nombre y teléfono");
+    if (!form.phone2.trim()) return toast.error("Confirma tu número de WhatsApp");
+    if (form.phone.trim() !== form.phone2.trim()) return toast.error("Los teléfonos no coinciden. Revísalos para no perderte la confirmación por WhatsApp");
     if (form.forOther && !form.otherName.trim()) return toast.error("Escribe el nombre de la persona que viene");
     for (let i = 1; i < items.length; i++) {
       if (!(items[i].guestName || "").trim()) return toast.error(`Escribe el nombre de la persona de la cita ${i + 1}`);
@@ -219,7 +221,6 @@ export default function Booking() {
           <ChevronLeft className="h-4 w-4" /> Volver
         </button>
 
-        {/* Progress */}
         <div className="flex items-center justify-between mb-8 md:mb-10" data-testid="booking-progress">
           {STEPS.map((label, i) => (
             <div key={label} className="flex-1 flex items-center">
@@ -238,7 +239,6 @@ export default function Booking() {
           {step === 2 && "Tus datos"}
         </h1>
 
-        {/* Step content */}
         {step === 0 && (
           <div data-testid="step-services">
             <p className="text-sm text-neutral-400 mb-4">Pulsa los servicios que quieras — puedes añadir varios y agendarlos todos de una vez.</p>
@@ -377,17 +377,33 @@ export default function Booking() {
             <div>
               <Label className="text-xs tracking-overline uppercase text-neutral-500">Tu teléfono</Label>
               <Input
-  data-testid="input-phone"
-  value={form.phone}
-  onChange={(e) => {
-    // Solo números, sin límite de longitud (acepta números internacionales)
-    const soloNumeros = e.target.value.replace(/\D/g, '');
-    setForm({ ...form, phone: soloNumeros });
-  }}
-  className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12"
-  placeholder="600303030"
-  inputMode="numeric"
-/>
+                data-testid="input-phone"
+                value={form.phone}
+                onChange={(e) => {
+                  const soloNumeros = e.target.value.replace(/\D/g, "");
+                  setForm({ ...form, phone: soloNumeros });
+                }}
+                className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12"
+                placeholder="600303030"
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <Label className="text-xs tracking-overline uppercase text-neutral-500">Confirma tu WhatsApp</Label>
+              <Input
+                data-testid="input-phone-confirm"
+                value={form.phone2}
+                onChange={(e) => {
+                  const soloNumeros = e.target.value.replace(/\D/g, "");
+                  setForm({ ...form, phone2: soloNumeros });
+                }}
+                className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12"
+                placeholder="Repite tu número"
+                inputMode="numeric"
+              />
+              {form.phone2 && form.phone !== form.phone2 && (
+                <p className="text-xs text-red-400 mt-1.5">Los números no coinciden</p>
+              )}
             </div>
             <div>
               <Label className="text-xs tracking-overline uppercase text-neutral-500">Apodo (opcional)</Label>
@@ -419,7 +435,6 @@ export default function Booking() {
           </div>
         )}
 
-        {/* Nav */}
         <div className="mt-10 flex gap-3">
           {step > 0 && (
             <Button data-testid="booking-prev" variant="outline" className="border-white/10 bg-transparent hover:bg-white/5" onClick={goBack}>
@@ -432,7 +447,7 @@ export default function Booking() {
             </Button>
           )}
           {step === 2 && (
-            <Button data-testid="booking-submit" onClick={submit} disabled={submitting || !form.policy || !form.whatsapp} className="flex-1 h-12 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold btn-shine">
+            <Button data-testid="booking-submit" onClick={submit} disabled={submitting || !form.policy || !form.whatsapp || !form.phone2.trim() || form.phone.trim() !== form.phone2.trim()} className="flex-1 h-12 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold btn-shine">
               {submitting ? "Reservando…" : items.length > 1 ? `Confirmar ${items.length} citas` : "Confirmar reserva"}
             </Button>
           )}
