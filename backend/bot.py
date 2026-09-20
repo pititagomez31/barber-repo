@@ -167,14 +167,13 @@ def _params_tipo(tipo: str, cita: dict) -> list:
 
 
 async def enviar_a(telefono: str, tipo: str, cita: dict) -> bool:
-    print(f"### ENVIAR_A LLAMADA tipo={tipo!r} ###", flush=True)
+    """Si hay plantilla Meta configurada para este tipo, se usa (modo fiable fuera de ventana 24h)."""
     env_key = _TPL_ENV.get(tipo)
     if not env_key:
-        print(f"### ENVIAR_A sin env_key para tipo={tipo!r} ###", flush=True)
+        logger.warning("No hay configuración de plantilla para tipo %r", tipo)
         return await enviar_whatsapp(telefono, await generar_mensaje_gemini(tipo, cita))
 
     tpl = os.environ.get(env_key, "")
-    print(f"### ENVIAR_A env_key={env_key!r} tpl_leida={tpl!r} ###", flush=True)
     if tpl:
         return await enviar_whatsapp_template(telefono, tpl, _params_tipo(tipo, cita))
     return await enviar_whatsapp(telefono, await generar_mensaje_gemini(tipo, cita))
