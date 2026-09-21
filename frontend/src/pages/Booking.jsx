@@ -449,4 +449,33 @@ export default function Booking() {
               </span>
             </label>
             <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="whatsapp-optin-wrap">
-              <Checkbox data-testid="input-whatsapp-optin" checked={form.whatsapp} onCheckedChange={(v) => setForm({ ...form, whatsapp
+              <Checkbox data-testid="input-whatsapp-optin" checked={form.whatsapp} onCheckedChange={(v) => setForm({ ...form, whatsapp: !!v })} className="mt-1 border-[#25D366] data-[state=checked]:bg-[#25D366] data-[state=checked]:text-[#14141A]" />
+              <span className="text-sm text-neutral-300 leading-relaxed">
+                Acepto recibir <strong className="text-[#25D366]">confirmaciones y recordatorios de mi cita a través de WhatsApp</strong>. Puedo darme de baja en cualquier momento respondiendo STOP.
+              </span>
+            </label>
+            <p className="text-xs text-neutral-500 text-center">Máximo 6 citas activas por teléfono.</p>
+          </div>
+        )}
+
+        <div className="mt-10 flex gap-3">
+          {step > 0 && (
+            <Button data-testid="booking-prev" variant="outline" className="border-white/10 bg-transparent hover:bg-white/5" onClick={goBack}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> Atrás
+            </Button>
+          )}
+          {step === 0 && (
+            <Button data-testid="booking-next" onClick={goNext} className="flex-1 h-12 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold btn-shine">
+              Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+          {step === 2 && (
+            <Button data-testid="booking-submit" onClick={submit} disabled={submitting || !form.policy || !form.whatsapp || !form.phone2.trim() || form.phone.trim() !== form.phone2.trim()} className="flex-1 h-12 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold btn-shine">
+              {submitting ? "Reservando…" : items.length > 1 ? `Confirmar ${items.length} citas` : "Confirmar reserva"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
