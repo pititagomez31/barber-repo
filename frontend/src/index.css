@@ -92,3 +92,45 @@
         to { opacity: 1; transform: translateY(0); }
     }
 }
+
+/* ============================================================
+   Indicadores de disponibilidad en el calendario de reservas
+   Punto verde = hay huecos ese día · Punto rojo = no hay huecos
+   ============================================================ */
+.dia-disponible,
+.dia-no-disponible {
+  position: relative;
+}
+
+.dia-disponible::after,
+.dia-no-disponible::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.dia-disponible::after {
+  background-color: #25D366; /* verde WhatsApp */
+}
+
+.dia-no-disponible::after {
+  background-color: #dc3545; /* rojo */
+}
+
+/* Cuando el día está seleccionado (fondo dorado), punto oscuro para contraste */
+.rdp-day_selected.dia-disponible::after,
+.rdp-day_selected.dia-no-disponible::after {
+  background-color: #14141A;
+}
+
+/* Si el día está fuera de rango (disabled), ocultamos el punto */
+.rdp-day_disabled.dia-disponible::after,
+.rdp-day_disabled.dia-no-disponible::after {
+  display: none;
+}
