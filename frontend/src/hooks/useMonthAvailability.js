@@ -1,25 +1,18 @@
 import { useEffect, useState } from "react";
-import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  addDays,
-  startOfToday,
-  isSameDay,
-} from "date-fns";
+import { eachDayOfInterval, addMonths, startOfToday } from "date-fns";
 import { api } from "@/lib/api";
 
 /**
- * Consulta en paralelo la disponibilidad de todos los días del mes visible.
- * Devuelve un Set con las fechas (formato "yyyy-MM-dd") que tienen al menos 1 slot libre.
+ * Consulta la disponibilidad de los próximos 6 meses (desde hoy).
+ * Devuelve un Set con las fechas "yyyy-MM-dd" que tienen al menos 1 slot libre.
+ * Se consulta UNA VEZ al montar (o cuando cambia el serviceId) — no por mes visible.
  */
 export default function useMonthAvailability(month, serviceId) {
   const [availableDays, setAvailableDays] = useState(new Set());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!month || !serviceId) {
+    if (!serviceId) {
       setAvailableDays(new Set());
       return;
     }
@@ -30,33 +23,13 @@ export default function useMonthAvailability(month, serviceId) {
       setLoading(true);
       try {
         const hoy = startOfToday();
-        const hasta = addDays(hoy, 60);
+        const hasta = addMonths(hoy, 6); // próximos 6 meses
+        const dias = eachDayOfInterval({ start: hoy, end: hasta });
 
-        // Normalizar el mes visible al día 1 sin hora
-        const mesNormalizado = startOfMonth(new Date(month));
-        const primerDiaMes = startOfMonth(mesNormalizado);
-        const ultimoDiaMes = endOfMonth(mesNormalizado);
-
-        // Rango a consultar: intersección [hoy, hoy+60] con el mes visible
-        const desde = primerDiaMes < hoy ? hoy : primerDiaMes;
-        const hastaFinal = ultimoDiaMes > hasta ? hasta : ultimoDiaMes;
-
-        if (desde > hastaFinal) {
-          if (!cancelled) {
-            setAvailableDays(new Set());
-            setLoading(false);
-          }
-          return;
-        }
-
-        const dias = eachDayOfInterval({ start: desde, end: hastaFinal });
-
-        // DEBUG: ver qué días vamos a consultar
-        console.log("[useMonthAvailability] Consultando días:", dias.length, "serviceId:", serviceId);
+        console.log("[useMonthAvailability] Consultando", dias.length, "días (6 meses) para serviceId:", serviceId);
 
         const resultados = await Promise.allSettled(
           dias.map(async (d) => {
-            // IMPORTANTE: usar las partes locales de la fecha para evitar desfase por TZ
             const y = d.getFullYear();
             const m = String(d.getMonth() + 1).padStart(2, "0");
             const day = String(d.getDate()).padStart(2, "0");
@@ -70,7 +43,7 @@ export default function useMonthAvailability(month, serviceId) {
                   ? r.data
                   : [];
               return { date: dateStr, slots };
-            } catch (err) {
+            } catch {
               return { date: dateStr, slots: [] };
             }
           })
@@ -85,9 +58,7 @@ export default function useMonthAvailability(month, serviceId) {
           }
         });
 
-        // DEBUG: ver el set resultante
-        console.log("[useMonthAvailability] Días con disponibilidad:", Array.from(set));
-
+        console.log("[useMonthAvailability] Días con disponibilidad:", set.size, "de", dias.length);
         setAvailableDays(set);
       } catch (e) {
         console.error("[useMonthAvailability] Error:", e);
@@ -101,7 +72,7 @@ export default function useMonthAvailability(month, serviceId) {
     return () => {
       cancelled = true;
     };
-  }, [month, serviceId]);
+  }, [serviceId]); // ⚠️ OJO: quitamos `month` de las deps — solo se consulta 1 vez
 
   return { availableDays, loading };
 }
