@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { format, addDays, startOfToday, startOfMonth } from "date-fns";
+import { format, addDays, startOfToday, startOfMonth, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Check, Scissors, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,13 +35,13 @@ export default function Booking() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null); // array de citas creadas
 
-  // NUEVO: mes visible en el calendario (para saber qué días consultar)
+  // Mes visible en el calendario (solo para navegación visual)
   const [visibleMonth, setVisibleMonth] = useState(startOfMonth(new Date()));
 
   const current = items[schedIdx];
 
-  // NUEVO: consultar disponibilidad de todos los días del mes visible
-  const { availableDays } = useMonthAvailability(visibleMonth, current?.serviceId);
+  // Consulta disponibilidad de los próximos 6 meses (una sola vez por servicio)
+  const { availableDays, loading: loadingAvailability } = useMonthAvailability(visibleMonth, current?.serviceId);
 
   useEffect(() => {
     api.get("/services").then((r) => setServices(Array.isArray(r.data) ? r.data : [])).catch(() => setServices([]));
@@ -294,7 +294,12 @@ export default function Booking() {
               ))}
             </div>
             <div className="flex justify-center" data-testid="step-date">
-              <div className="bg-[#1A1A1E] border border-[#2A2A32] rounded-lg p-4">
+              <div className="bg-[#1A1A1E] border border-[#2A2A32] rounded-lg p-4 relative">
+                {loadingAvailability && (
+                  <div className="absolute top-2 right-2 text-[10px] text-[#D4B77A]/70 animate-pulse" data-testid="availability-loading">
+                    cargando disponibilidad…
+                  </div>
+                )}
                 <Calendar
                   mode="single"
                   selected={date}
@@ -306,14 +311,22 @@ export default function Booking() {
                   className="[--rdp-accent-color:#D4B77A]"
                   modifiers={{
                     diaDisponible: (d) => {
-                      const key = format(d, "yyyy-MM-dd");
-                      const hoyStr = format(startOfToday(), "yyyy-MM-dd");
-                      return key >= hoyStr && availableDays.has(key);
+                      if (!d) return false;
+                      const y = d.getFullYear();
+                      const m = String(d.getMonth() + 1).padStart(2, "0");
+                      const day = String(d.getDate()).padStart(2, "0");
+                      const key = `${y}-${m}-${day}`;
+                      return availableDays.has(key);
                     },
                     diaNoDisponible: (d) => {
-                      const key = format(d, "yyyy-MM-dd");
-                      const hoyStr = format(startOfToday(), "yyyy-MM-dd");
-                      return key >= hoyStr && !availableDays.has(key);
+                      if (!d) return false;
+                      const y = d.getFullYear();
+                      const m = String(d.getMonth() + 1).padStart(2, "0");
+                      const day = String(d.getDate()).padStart(2, "0");
+                      const key = `${y}-${m}-${day}`;
+                      const hoy = startOfToday();
+                      const max = addMonths(hoy, 6);
+                      return d >= hoy && d <= max && !availableDays.has(key);
                     },
                   }}
                   modifiersClassNames={{
