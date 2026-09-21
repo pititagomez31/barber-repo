@@ -529,10 +529,10 @@ async def force_appointment(body: ForceAppointmentIn, admin=Depends(get_current_
     svc = await db.services.find_one({"id": body.service_id}, {"_id": 0})
     if not svc:
         raise HTTPException(404, "Servicio no encontrado")
-
+    
     start_m = parse_hhmm(body.start)
     end_m = start_m + svc["duration_min"]
-
+    
     # Upsert client
     identity_name = body.client_name
     client_doc = await db.clients.find_one({"phone": body.client_phone}, {"_id": 0})
@@ -545,7 +545,7 @@ async def force_appointment(body: ForceAppointmentIn, admin=Depends(get_current_
             "created_at": now_iso(),
         }
         await db.clients.insert_one(client_doc.copy())
-
+    
     appt = {
         "id": new_id(),
         "service_id": svc["id"],
@@ -599,7 +599,8 @@ async def cancel_by_client(aid: str, phone: str):
         raise HTTPException(404, "Cita no encontrada")
     if appt["client_phone"] != phone:
         raise HTTPException(403, "Teléfono no coincide")
-    if (datetime.fromisoformat(appt["date"]) - datetime.now()).total_seconds() < 12 * 3600:
+    appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
+    if (appt_time - datetime.now()).total_seconds() < 12 * 3600:
         raise HTTPException(400, "No puedes cancelar menos de 12 horas antes")
     await db.appointments.update_one({"id": aid}, {"$set": {"status": "cancelled"}})
     appt["status"] = "cancelled"
@@ -624,24 +625,24 @@ async def modificar_cita(aid: str, body: dict):
     phone = body.get("phone", "")
     new_date = body.get("date")
     new_start = body.get("start")
-
+    
     appt = await db.appointments.find_one({"id": aid}, {"_id": 0})
     if not appt:
         raise HTTPException(404, "Cita no encontrada")
     if appt["client_phone"] != phone:
         raise HTTPException(403, "Teléfono no coincide")
-
+    
     # Check 12h rule
     appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
     if (appt_time - datetime.now()).total_seconds() < 12 * 3600:
         raise HTTPException(400, "No puedes modificar menos de 12 horas antes")
-
+    
     # Verify new slot available
     svc = await db.services.find_one({"id": appt["service_id"]}, {"_id": 0})
     slots = await _compute_slots(new_date, svc["duration_min"])
     if new_start not in slots:
         raise HTTPException(409, "La hora no está disponible")
-
+    
     # Update
     start_m = parse_hhmm(new_start)
     end_m = start_m + svc["duration_min"]
@@ -650,7 +651,7 @@ async def modificar_cita(aid: str, body: dict):
         "start": new_start,
         "end": fmt_hhmm(end_m),
     }})
-
+    
     appt["date"] = new_date
     appt["start"] = new_start
     appt["end"] = fmt_hhmm(end_m)
@@ -697,6 +698,8 @@ async def recordatorio_send(aid: str, admin=Depends(get_current_admin)):
     appt = await db.appointments.find_one({"id": aid}, {"_id": 0})
     if not appt:
         raise HTTPException(404, "Cita no encontrada")
+    if await is_opted_out(appt["client_phone"]):
+        return {"ok": False, "sent": False, "error": "El cliente está dado de baja de WhatsApp (STOP)"}
     sent = await whatsapp_bot.enviar_a(appt["client_phone"], "recordatorio", appt)
     if sent:
         await db.appointments.update_one({"id": aid}, {"$set": {"recordatorio_enviado": True}})
@@ -709,7 +712,7 @@ EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
 
 _SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "goo.gl", "rebrand.ly")
 _CRED_ASK = ("reply with your password", "reply with the code", "send your password", "cvv",
-              "contraseña", "código", "clave", "cvv", "tarjeta", "card")
+             "contraseña", "código", "clave", "cvv", "tarjeta", "card")
 _HOSTISH = re.compile(r"\b(?:https?://)?((?:[a-z0-9-]+\.)+[a-z]{2,})", re.I)
 
 def _host_ok(host: str) -> bool:
@@ -726,15 +729,15 @@ class _EmailScan(HTMLParser):
         self._href = None
         self._text = []
         self.links = []
-
+    
     def handle_starttag(self, tag, attrs):
         if tag == "a":
             self._href = dict(attrs).get("href")
-
+    
     def handle_data(self, data):
         if self._href is not None:
             self._text.append(data)
-
+    
     def handle_endtag(self, tag):
         if tag == "a" and self._href:
             self.links.append((self._href, "".join(self._text).strip()))
@@ -745,19 +748,19 @@ def _assert_safe_email(subject: str, html: str) -> None:
     """Detect phishing patterns in email."""
     if any(w.lower() in subject.lower() for w in _CRED_ASK):
         raise ValueError("Subject requests credentials (phishing risk)")
-
+    
     scan = _EmailScan()
     try:
         scan.feed(html)
     except Exception:
         pass
-
+    
     for href, text in scan.links:
         try:
             parsed = urlparse(href)
             shown_host = text.split("://")[-1].split("/")[0] if text.startswith(("http", "www")) else text
             real_host = parsed.netloc or parsed.path.split("/")[0]
-
+            
             if not _host_ok(real_host) or not _same_site(shown_host, real_host):
                 raise ValueError(f"Link mismatch: shown={shown_host}, real={real_host}")
         except Exception as e:
@@ -766,30 +769,30 @@ def _assert_safe_email(subject: str, html: str) -> None:
 async def send_email(*, to: str, subject: str, html: str, reply_to: Optional[str] = None) -> bool:
     """Send email via SMTP."""
     _assert_safe_email(subject, html)
-
+    
     smtp_host = os.environ.get("SMTP_HOST", "")
     smtp_port = int(os.environ.get("SMTP_PORT", "465"))
     smtp_user = os.environ.get("SMTP_USER", "")
     smtp_password = os.environ.get("SMTP_PASSWORD", "")
-
+    
     if not all([smtp_host, smtp_user, smtp_password]):
         logger.warning("Email no configurado (falta SMTP_*)")
         return False
-
+    
     try:
         import aiosmtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
-
+        
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = f"{EMAIL_FROM_NAME} <{smtp_user}>"
         msg["To"] = to
         if reply_to:
             msg["Reply-To"] = reply_to
-
+        
         msg.attach(MIMEText(html, "html"))
-
+        
         async with aiosmtplib.SMTP(hostname=smtp_host, port=smtp_port) as smtp:
             await smtp.login(smtp_user, smtp_password)
             await smtp.send_message(msg)
@@ -810,13 +813,15 @@ async def run_recordatorios() -> int:
         "status": "confirmed",
         "recordatorio_enviado": False,
     }, {"_id": 0}).to_list(500)
-
+    
     sent = 0
     for a in appts:
+        if await is_opted_out(a["client_phone"]):
+            continue
         if await whatsapp_bot.enviar_a(a["client_phone"], "recordatorio", a):
             await db.appointments.update_one({"id": a["id"]}, {"$set": {"recordatorio_enviado": True}})
             sent += 1
-
+    
     logger.info(f"Recordatorios enviados: {sent}/{len(appts)}")
     return sent
 
@@ -827,11 +832,11 @@ async def cron_recordatorios(request: Request, background: BackgroundTasks):
     expected = os.environ.get("WEBHOOK_CRON_SECRET", "")
     if not expected or not auth.startswith("Bearer "):
         raise HTTPException(401, "Sin autenticación")
-
+    
     token = auth.split(" ", 1)[1]
     if not hmac.compare_digest(token, expected):
         raise HTTPException(401, "Token inválido")
-
+    
     background.add_task(run_recordatorios)
     return {"ok": True}
 
@@ -884,28 +889,28 @@ async def _send_backup_email(subject: str, html: str, attachments: list) -> bool
     if not SMTP_HOST or not SMTP_USER:
         logger.warning("SMTP no configurado para backup")
         return False
-
+    
     try:
         import aiosmtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
         from email.mime.base import MIMEBase
         from email import encoders
-
+        
         msg = MIMEMultipart()
         msg["Subject"] = subject
         msg["From"] = BACKUP_EMAIL_FROM
         msg["To"] = BACKUP_EMAIL_TO
-
+        
         msg.attach(MIMEText(html, "html"))
-
+        
         for filename, content in attachments:
             part = MIMEBase("application", "octet-stream")
             part.set_payload(content)
             encoders.encode_base64(part)
             part.add_header("Content-Disposition", f"attachment; filename= {filename}")
             msg.attach(part)
-
+        
         async with aiosmtplib.SMTP(hostname=SMTP_HOST, port=SMTP_PORT) as smtp:
             await smtp.login(SMTP_USER, SMTP_PASSWORD)
             await smtp.send_message(msg)
@@ -918,16 +923,16 @@ async def run_backup() -> dict:
     """Create and send backup."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
-
+    
     appts = await db.appointments.find({}, {"_id": 0}).to_list(5000)
-
+    
     # JSON backup
     json_file = BACKUP_DIR / f"backup_citas_{today}.json"
     json_file.write_text(json.dumps(appts, indent=2, default=str))
-
+    
     # CSV backup
     csv_content = _appointments_to_csv(appts)
-
+    
     # Send email
     html = _appointments_to_html(appts)
     await _send_backup_email(
@@ -938,7 +943,7 @@ async def run_backup() -> dict:
             (f"citas_{today}.csv", csv_content.encode()),
         ]
     )
-
+    
     return {"ok": True, "count": len(appts), "file": str(json_file)}
 
 @api.post("/cron/backup")
@@ -948,11 +953,11 @@ async def cron_backup(request: Request, background: BackgroundTasks):
     expected = os.environ.get("WEBHOOK_CRON_SECRET", "")
     if not expected or not auth.startswith("Bearer "):
         raise HTTPException(401, "Sin autenticación")
-
+    
     token = auth.split(" ", 1)[1]
     if not hmac.compare_digest(token, expected):
         raise HTTPException(401, "Token inválido")
-
+    
     background.add_task(run_backup)
     return {"ok": True}
 
@@ -983,10 +988,10 @@ async def whatsapp_webhook_verify(request: Request):
     mode = request.query_params.get("hub.mode")
     token = request.query_params.get("hub.verify_token")
     challenge = request.query_params.get("hub.challenge")
-
+    
     if mode == "subscribe" and token == WHATSAPP_VERIFY_TOKEN:
         return PlainTextResponse(challenge)
-
+    
     raise HTTPException(403, "Webhook verification failed")
 
 @api.post("/whatsapp/webhook")
@@ -999,7 +1004,7 @@ async def whatsapp_webhook_receive(request: Request, background: BackgroundTasks
     expected = f"sha256={hmac.new(META_APP_SECRET.encode(), payload, hashlib.sha256).hexdigest()}"
     if not hmac.compare_digest(sig, expected):
         raise HTTPException(403, "Invalid signature")
-
+    
     # Process message (background task)
     background.add_task(_process_whatsapp_message, body)
     return {"ok": True}
@@ -1011,29 +1016,29 @@ async def _process_whatsapp_message(body: dict):
         changes = entry.get("changes", [{}])
         if not changes:
             return
-
+        
         messages = changes[0].get("value", {}).get("messages", [])
         if not messages:
             return
-
+        
         msg = messages[0]
         de = msg.get("from")
         texto = msg.get("text", {}).get("body", "")
-
+        
         if not de or not texto:
             return
-
+        
         # Log webhook
         await db.whatsapp_webhook_log.insert_one({
             "from": de,
             "text": texto,
             "ts": now_iso(),
         })
-
+        
         # Get client name from DB
         client = await db.clients.find_one({"phone": de}, {"_id": 0})
         nombre = client["name"] if client else f"Cliente {de[-4:]}"
-
+        
         # Forward to barber
         await whatsapp_bot.reenviar_respuesta_cliente(de, nombre, texto)
     except Exception as e:
@@ -1048,6 +1053,12 @@ async def wa_opt_out(telefono: str) -> bool:
         upsert=True,
     )
     return True
+
+async def is_opted_out(telefono: str) -> bool:
+    """Comprueba (sin modificar nada) si el teléfono está dado de baja de WhatsApp."""
+    tel_norm = whatsapp_bot.normalizar_telefono(telefono)
+    doc = await db.whatsapp_optout.find_one({"phone": tel_norm}, {"_id": 0})
+    return bool(doc and doc.get("opt_out"))
 
 async def gestionar_opt_out(de_telefono: str, baja: bool) -> None:
     """Handle opt-out requests."""
@@ -1071,7 +1082,7 @@ async def whatsapp_test_envio(body: dict, admin=Depends(get_current_admin)):
     plantilla = body.get("template", "")
     params = body.get("params", [])
     texto = body.get("text", "")
-
+    
     result = await whatsapp_bot.probar_envio(telefono, plantilla, "", params, texto)
     return result
 
@@ -1087,6 +1098,25 @@ async def whatsapp_webhook_log(admin=Depends(get_current_admin)):
 async def app_root():
     return {"message": "+58 BarberStudio"}
 
+async def _recordatorios_scheduler():
+    """Lanza run_recordatorios() todos los días a las 18:00 (Atlantic/Canary),
+    sustituyendo la dependencia de cron-job.org por un scheduler interno."""
+    tz = ZoneInfo("Atlantic/Canary")
+    while True:
+        try:
+            now = datetime.now(tz)
+            target = now.replace(hour=18, minute=0, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+            wait_seconds = (target - now).total_seconds()
+            logger.info("Recordatorios: próxima ejecución en %.0f s (%s)", wait_seconds, target.isoformat())
+            await asyncio.sleep(wait_seconds)
+            sent = await run_recordatorios()
+            logger.info("Recordatorios (scheduler interno): %d enviados", sent)
+        except Exception as e:
+            logger.error("Error en scheduler de recordatorios: %s", e)
+            await asyncio.sleep(60)  # evita bucle de error inmediato; reintenta en 1 min
+
 @app.on_event("startup")
 async def on_start():
     logger.info("Backend iniciado")
@@ -1095,6 +1125,7 @@ async def on_start():
     await db.appointments.create_index("client_phone")
     await db.services.create_index("id", unique=True)
     await db.users.create_index("username", unique=True)
+    asyncio.create_task(_recordatorios_scheduler())
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
