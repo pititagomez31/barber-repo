@@ -129,7 +129,13 @@
   background-color: #14141A;
 }
 
-/* Si el día está fuera de rango (disabled), ocultamos el punto */
+/* Si el día está fuera del mes visible (outside days) → sin punto */
+.rdp-day_outside.dia-disponible::after,
+.rdp-day_outside.dia-no-disponible::after {
+  display: none;
+}
+
+/* Si el día está fuera de rango (disabled) → sin punto */
 .rdp-day_disabled.dia-disponible::after,
 .rdp-day_disabled.dia-no-disponible::after {
   display: none;
