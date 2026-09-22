@@ -140,3 +140,31 @@
 .rdp-day_disabled.dia-no-disponible::after {
   display: none;
 }
+/* ============================================================
+   Gorrito de Navidad en el calendario (21-31 dic 2026)
+   ============================================================ */
+.dia-navidad {
+  position: relative;
+}
+
+.dia-navidad::before {
+  content: '🎅';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  font-size: 12px;
+  line-height: 1;
+  transform: rotate(15deg);
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+
+/* Si el día está fuera del mes visible → sin gorrito */
+.rdp-day_outside.dia-navidad::before {
+  display: none;
+}
+
+/* Si el día está disabled → sin gorrito */
+.rdp-day_disabled.dia-navidad::before {
+  display: none;
+}
