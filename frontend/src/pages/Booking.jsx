@@ -38,7 +38,6 @@ function esFechaNavidad(date) {
 
 function matchPrecioNavidad(serviceName) {
   const n = (serviceName || "").toLowerCase();
-  // "corte barba y cejas" primero para que no lo capture "corte y barba"
   if (n.includes("corte") && n.includes("barba") && n.includes("cejas")) {
     return PRECIOS_NAVIDAD.find((p) => p.key === "corte barba y cejas");
   }
@@ -62,7 +61,7 @@ export default function Booking() {
   const [step, setStep] = useState(0);
   const [services, setServices] = useState([]);
   const [business, setBusiness] = useState({});
-  const [items, setItems] = useState([]); // citas a agendar: {serviceId, name, durationMin, priceEur, date, dateStr, time}
+  const [items, setItems] = useState([]);
   const [schedIdx, setSchedIdx] = useState(0);
   const [date, setDate] = useState(null);
   const [slots, setSlots] = useState([]);
@@ -75,20 +74,14 @@ export default function Booking() {
     aceptaPrecioNavidad: false,
   });
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(null); // array de citas creadas
+  const [done, setDone] = useState(null);
 
-  // Mes visible en el calendario (solo para navegación visual)
   const [visibleMonth, setVisibleMonth] = useState(startOfMonth(new Date()));
 
   const current = items[schedIdx];
-
-  // Consulta disponibilidad de los próximos 6 meses (una sola vez por servicio)
   const { availableDays, loading: loadingAvailability } = useMonthAvailability(visibleMonth, current?.serviceId);
 
-  // ¿El día seleccionado actualmente cae en Navidad?
   const diaEsNavidad = esFechaNavidad(date);
-
-  // ¿Alguna cita del carrito cae en Navidad? (para el checkbox del paso 3)
   const hayNavidadEnCarrito = items.some((it) => it.date && esFechaNavidad(it.date));
 
   useEffect(() => {
@@ -114,7 +107,6 @@ export default function Booking() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.serviceId, date, schedIdx]);
 
-  // Si ya no hay Navidad en el carrito, reseteamos el checkbox de precio navideño
   useEffect(() => {
     if (!hayNavidadEnCarrito && form.aceptaPrecioNavidad) {
       setForm((f) => ({ ...f, aceptaPrecioNavidad: false }));
@@ -153,7 +145,6 @@ export default function Booking() {
 
   const totalMin = items.reduce((acc, i) => acc + (i.durationMin || 0), 0);
 
-  // Excluir las horas que ya ocupan las otras citas del carrito ese mismo día
   const toMin = (s) => parseInt(s.slice(0, 2)) * 60 + parseInt(s.slice(3));
   const dateStrNow = date ? format(date, "yyyy-MM-dd") : "";
   const visibleSlots = !current ? slots : slots.filter((t) => {
@@ -398,7 +389,6 @@ export default function Booking() {
               </div>
             </div>
 
-            {/* 🎄 Banner de precios de Navidad — solo cuando el día seleccionado cae del 21 al 31 dic 2026 */}
             {diaEsNavidad && (
               <div
                 data-testid="navidad-banner"
@@ -449,7 +439,7 @@ export default function Booking() {
             </div>
           </div>
         )}
-
+        
         {step === 2 && (
           <div className="space-y-5" data-testid="step-details">
             <Card className="bg-[#1A1A1E] border-[#2A2A32]">
@@ -514,4 +504,90 @@ export default function Booking() {
                   const soloNumeros = e.target.value.replace(/\D/g, "");
                   setForm({ ...form, phone: soloNumeros });
                 }}
-                className="mt-2 bg-[#1A1A1E
+                className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12"
+                placeholder="600303030"
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <Label className="text-xs tracking-overline uppercase text-neutral-500">Confirma tu WhatsApp</Label>
+              <Input
+                data-testid="input-phone-confirm"
+                value={form.phone2}
+                onChange={(e) => {
+                  const soloNumeros = e.target.value.replace(/\D/g, "");
+                  setForm({ ...form, phone2: soloNumeros });
+                }}
+                className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12"
+                placeholder="Repite tu número"
+                inputMode="numeric"
+              />
+              {form.phone2 && form.phone !== form.phone2 && (
+                <p className="text-xs text-red-400 mt-1.5">Los números no coinciden</p>
+              )}
+            </div>
+            <div>
+              <Label className="text-xs tracking-overline uppercase text-neutral-500">Apodo (opcional)</Label>
+              <Input data-testid="input-nickname" value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="Juanito" />
+            </div>
+            <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="forother-wrap">
+              <Checkbox data-testid="input-forother" checked={form.forOther} onCheckedChange={(v) => setForm({ ...form, forOther: !!v })} className="mt-0.5 border-[#D4B77A] data-[state=checked]:bg-[#D4B77A] data-[state=checked]:text-[#14141A]" />
+              <span className="text-sm text-neutral-300 leading-relaxed">La cita es para <strong className="text-[#D4B77A]">otra persona</strong> (ej: mi hijo, un amigo)</span>
+            </label>
+            {form.forOther && (
+              <div data-testid="other-name-wrap" className="fade-up">
+                <Label className="text-xs tracking-overline uppercase text-neutral-500">Nombre de quien viene</Label>
+                <Input data-testid="input-other-name" value={form.otherName} onChange={(e) => setForm({ ...form, otherName: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="Nombre y apellido" />
+              </div>
+            )}
+            <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="policy-checkbox-wrap">
+              <Checkbox data-testid="input-policy" checked={form.policy} onCheckedChange={(v) => setForm({ ...form, policy: !!v })} className="mt-1 border-[#D4B77A] data-[state=checked]:bg-[#D4B77A] data-[state=checked]:text-[#14141A]" />
+              <span className="text-sm text-neutral-300 leading-relaxed">
+                Acepto la <strong className="text-[#D4B77A]">política del 50%</strong>: si no me presento sin avisar, el barbero podrá cobrarme el 50% del servicio en mi próxima visita o bloquear futuras reservas. Cancelaciones permitidas hasta 12h antes.
+              </span>
+            </label>
+            <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="whatsapp-optin-wrap">
+              <Checkbox data-testid="input-whatsapp-optin" checked={form.whatsapp} onCheckedChange={(v) => setForm({ ...form, whatsapp: !!v })} className="mt-1 border-[#25D366] data-[state=checked]:bg-[#25D366] data-[state=checked]:text-[#14141A]" />
+              <span className="text-sm text-neutral-300 leading-relaxed">
+                Acepto recibir <strong className="text-[#25D366]">confirmaciones y recordatorios de mi cita a través de WhatsApp</strong>. Puedo darme de baja en cualquier momento respondiendo STOP.
+              </span>
+            </label>
+            {hayNavidadEnCarrito && (
+              <label className="flex items-start gap-3 p-4 rounded-md border border-[#D4B77A]/50 bg-gradient-to-br from-[#1F1A14] to-[#1A1A1E] fade-up" data-testid="navidad-checkbox-wrap">
+                <Checkbox
+                  data-testid="input-navidad"
+                  checked={form.aceptaPrecioNavidad}
+                  onCheckedChange={(v) => setForm({ ...form, aceptaPrecioNavidad: !!v })}
+                  className="mt-1 border-[#D4B77A] data-[state=checked]:bg-[#D4B77A] data-[state=checked]:text-[#14141A]"
+                />
+                <span className="text-sm text-neutral-300 leading-relaxed">
+                  🎄 <strong className="text-[#D4B77A]">Confirmo el precio especial de Navidad</strong> para mi cita (Solo corte 20€ · Corte y barba 25€ · Corte, barba y cejas 28€). Entiendo que el pago se realiza <strong className="text-[#D4B77A]">en la barbería al finalizar el servicio</strong>.
+                </span>
+              </label>
+            )}
+            <p className="text-xs text-neutral-500 text-center">Máximo 6 citas activas por teléfono.</p>
+          </div>
+        )}
+
+        <div className="mt-10 flex gap-3">
+          {step > 0 && (
+            <Button data-testid="booking-prev" variant="outline" className="border-white/10 bg-transparent hover:bg-white/5" onClick={goBack}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> Atrás
+            </Button>
+          )}
+          {step === 0 && (
+            <Button data-testid="booking-next" onClick={goNext} className="flex-1 h-12 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold btn-shine">
+              Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+          {step === 2 && (
+            <Button data-testid="booking-submit" onClick={submit} disabled={submitting || !form.policy || !form.whatsapp || !form.phone2.trim() || form.phone.trim() !== form.phone2.trim() || (hayNavidadEnCarrito && !form.aceptaPrecioNavidad)} className="flex-1 h-12 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold btn-shine">
+              {submitting ? "Reservando…" : items.length > 1 ? `Confirmar ${items.length} citas` : "Confirmar reserva"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
