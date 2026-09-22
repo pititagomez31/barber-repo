@@ -3,7 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { format, addDays, startOfToday, startOfMonth, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Check, Scissors, Clock, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Scissors, Clock, X, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,43 @@ import useMonthAvailability from "@/hooks/useMonthAvailability";
 
 const STEPS = ["Servicios", "Día y hora", "Tus datos"];
 const MAX_ITEMS = 3;
+
+// ⚙️ Configuración de precios especiales de Navidad 2026
+const NAVIDAD_YEAR = 2026;
+const NAVIDAD_START = new Date(NAVIDAD_YEAR, 11, 21); // 21 dic
+const NAVIDAD_END = new Date(NAVIDAD_YEAR, 11, 31, 23, 59, 59); // 31 dic
+
+const PRECIOS_NAVIDAD = [
+  { key: "solo corte", label: "Solo corte", precio: "20€" },
+  { key: "corte y barba", label: "Corte y barba", precio: "25€" },
+  { key: "corte barba y cejas", label: "Corte, barba y cejas", precio: "28€" },
+];
+
+function esFechaNavidad(date) {
+  if (!date) return false;
+  const y = date.getFullYear();
+  if (y !== NAVIDAD_YEAR) return false;
+  const t = date.getTime();
+  return t >= NAVIDAD_START.getTime() && t <= NAVIDAD_END.getTime();
+}
+
+function matchPrecioNavidad(serviceName) {
+  const n = (serviceName || "").toLowerCase();
+  // "corte barba y cejas" primero para que no lo capture "corte y barba"
+  if (n.includes("corte") && n.includes("barba") && n.includes("cejas")) {
+    return PRECIOS_NAVIDAD.find((p) => p.key === "corte barba y cejas");
+  }
+  if (n.includes("corte") && n.includes("barba")) {
+    return PRECIOS_NAVIDAD.find((p) => p.key === "corte y barba");
+  }
+  if (n.includes("solo") && n.includes("corte")) {
+    return PRECIOS_NAVIDAD.find((p) => p.key === "solo corte");
+  }
+  if (n === "corte" || n.includes("corte de cabello") || n.includes("corte pelo")) {
+    return PRECIOS_NAVIDAD.find((p) => p.key === "solo corte");
+  }
+  return null;
+}
 
 export default function Booking() {
   const [params] = useSearchParams();
@@ -31,7 +68,12 @@ export default function Booking() {
   const [slots, setSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [time, setTime] = useState("");
-  const [form, setForm] = useState({ name: "", nickname: "", phone: "", phone2: "", email: "", forOther: false, otherName: "", policy: false, whatsapp: false });
+  const [form, setForm] = useState({
+    name: "", nickname: "", phone: "", phone2: "", email: "",
+    forOther: false, otherName: "",
+    policy: false, whatsapp: false,
+    aceptaPrecioNavidad: false,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null); // array de citas creadas
 
@@ -42,6 +84,12 @@ export default function Booking() {
 
   // Consulta disponibilidad de los próximos 6 meses (una sola vez por servicio)
   const { availableDays, loading: loadingAvailability } = useMonthAvailability(visibleMonth, current?.serviceId);
+
+  // ¿El día seleccionado actualmente cae en Navidad?
+  const diaEsNavidad = esFechaNavidad(date);
+
+  // ¿Alguna cita del carrito cae en Navidad? (para el checkbox del paso 3)
+  const hayNavidadEnCarrito = items.some((it) => it.date && esFechaNavidad(it.date));
 
   useEffect(() => {
     api.get("/services").then((r) => setServices(Array.isArray(r.data) ? r.data : [])).catch(() => setServices([]));
@@ -65,6 +113,14 @@ export default function Booking() {
       .finally(() => setLoadingSlots(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.serviceId, date, schedIdx]);
+
+  // Si ya no hay Navidad en el carrito, reseteamos el checkbox de precio navideño
+  useEffect(() => {
+    if (!hayNavidadEnCarrito && form.aceptaPrecioNavidad) {
+      setForm((f) => ({ ...f, aceptaPrecioNavidad: false }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hayNavidadEnCarrito]);
 
   const addService = (s) => {
     if (items.length >= MAX_ITEMS) return toast.error(`Máximo ${MAX_ITEMS} citas por reserva`);
@@ -143,6 +199,9 @@ export default function Booking() {
     }
     if (!form.policy) return toast.error("Debes aceptar la política del 50%");
     if (!form.whatsapp) return toast.error("Debes aceptar recibir confirmaciones y recordatorios por WhatsApp");
+    if (hayNavidadEnCarrito && !form.aceptaPrecioNavidad) {
+      return toast.error("Debes confirmar el precio especial de Navidad para continuar");
+    }
     setSubmitting(true);
     const bookerName = form.name.trim();
     const guestName = form.otherName.trim();
@@ -184,7 +243,7 @@ export default function Booking() {
     const plural = done.length > 1;
     const addAnother = () => {
       setItems([]); setSchedIdx(0); setDate(null); setTime("");
-      setForm({ ...form, policy: false, whatsapp: false });
+      setForm({ ...form, policy: false, whatsapp: false, aceptaPrecioNavidad: false });
       setDone(null); setStep(0);
     };
     return (
@@ -328,14 +387,43 @@ export default function Booking() {
                       const max = addMonths(hoy, 6);
                       return d >= hoy && d <= max && !availableDays.has(key);
                     },
+                    diaNavidad: (d) => esFechaNavidad(d),
                   }}
                   modifiersClassNames={{
                     diaDisponible: "dia-disponible",
                     diaNoDisponible: "dia-no-disponible",
+                    diaNavidad: "dia-navidad",
                   }}
                 />
               </div>
             </div>
+
+            {/* 🎄 Banner de precios de Navidad — solo cuando el día seleccionado cae del 21 al 31 dic 2026 */}
+            {diaEsNavidad && (
+              <div
+                data-testid="navidad-banner"
+                className="fade-up rounded-xl border border-[#D4B77A]/40 bg-gradient-to-br from-[#1F1A14] via-[#1A1A1E] to-[#1A1F1A] p-5 relative overflow-hidden"
+              >
+                <div className="absolute -top-6 -right-6 text-7xl opacity-15 select-none pointer-events-none">🎄</div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Gift className="h-4 w-4 text-[#D4B77A]" />
+                  <p className="tracking-overline uppercase text-xs text-[#D4B77A]">Precios especiales de Navidad</p>
+                </div>
+                <p className="font-display italic text-xl md:text-2xl mb-3">Del 21 al 31 de diciembre</p>
+                <ul className="space-y-1.5 text-sm">
+                  {PRECIOS_NAVIDAD.map((p) => (
+                    <li key={p.key} className="flex justify-between border-b border-[#2A2A32]/60 py-1.5 last:border-b-0">
+                      <span className="text-neutral-300">{p.label}</span>
+                      <span className="text-[#D4B77A] font-semibold">{p.precio}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-neutral-400">
+                  El pago se realiza en la barbería al finalizar el servicio. Al continuar, confirmarás el precio especial.
+                </p>
+              </div>
+            )}
+
             <div data-testid="step-time">
               {!date ? (
                 <p className="text-neutral-500 py-4 text-center text-sm">Elige un día para ver las horas disponibles.</p>
@@ -366,20 +454,27 @@ export default function Booking() {
           <div className="space-y-5" data-testid="step-details">
             <Card className="bg-[#1A1A1E] border-[#2A2A32]">
               <CardContent className="p-5 text-sm space-y-2">
-                {items.map((it, i) => (
-                  <div key={i} className="flex items-center justify-between gap-3" data-testid={`review-item-${i}`}>
-                    <span className="text-neutral-500"><span className="text-[#D4B77A] font-semibold">Cita {i + 1}</span> · {it.name}</span>
-                    <span className="flex items-center gap-2 shrink-0">
-                      <span className="text-right">{it.dateStr} · {it.time} <span className="text-neutral-500">({it.durationMin} min)</span></span>
-                      {items.length > 1 && (
-                        <button onClick={() => removeItem(i)} data-testid={`review-remove-${i}`} aria-label={`Eliminar cita ${i + 1}`}
-                          className="h-6 w-6 grid place-items-center rounded-full border border-red-400/60 text-red-400 hover:bg-red-400 hover:text-[#14141A] transition-colors">
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </span>
-                  </div>
-                ))}
+                {items.map((it, i) => {
+                  const esNav = it.date && esFechaNavidad(it.date);
+                  const precioNav = esNav ? matchPrecioNavidad(it.name) : null;
+                  return (
+                    <div key={i} className="flex items-center justify-between gap-3" data-testid={`review-item-${i}`}>
+                      <span className="text-neutral-500">
+                        <span className="text-[#D4B77A] font-semibold">Cita {i + 1}</span> · {it.name}
+                        {precioNav && <span className="ml-2 text-[10px] uppercase tracking-overline text-[#D4B77A]">🎄 {precioNav.precio}</span>}
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="text-right">{it.dateStr} · {it.time} <span className="text-neutral-500">({it.durationMin} min)</span></span>
+                        {items.length > 1 && (
+                          <button onClick={() => removeItem(i)} data-testid={`review-remove-${i}`} aria-label={`Eliminar cita ${i + 1}`}
+                            className="h-6 w-6 grid place-items-center rounded-full border border-red-400/60 text-red-400 hover:bg-red-400 hover:text-[#14141A] transition-colors">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
                 <p className="flex justify-between border-t border-[#2A2A32] pt-2 mt-1"><span className="text-neutral-500">Tiempo total</span><span data-testid="booking-total">{totalMin} min</span></p>
               </CardContent>
             </Card>
@@ -419,76 +514,4 @@ export default function Booking() {
                   const soloNumeros = e.target.value.replace(/\D/g, "");
                   setForm({ ...form, phone: soloNumeros });
                 }}
-                className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12"
-                placeholder="600303030"
-                inputMode="numeric"
-              />
-            </div>
-            <div>
-              <Label className="text-xs tracking-overline uppercase text-neutral-500">Confirma tu WhatsApp</Label>
-              <Input
-                data-testid="input-phone-confirm"
-                value={form.phone2}
-                onChange={(e) => {
-                  const soloNumeros = e.target.value.replace(/\D/g, "");
-                  setForm({ ...form, phone2: soloNumeros });
-                }}
-                className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12"
-                placeholder="Repite tu número"
-                inputMode="numeric"
-              />
-              {form.phone2 && form.phone !== form.phone2 && (
-                <p className="text-xs text-red-400 mt-1.5">Los números no coinciden</p>
-              )}
-            </div>
-            <div>
-              <Label className="text-xs tracking-overline uppercase text-neutral-500">Apodo (opcional)</Label>
-              <Input data-testid="input-nickname" value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="Juanito" />
-            </div>
-            <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="forother-wrap">
-              <Checkbox data-testid="input-forother" checked={form.forOther} onCheckedChange={(v) => setForm({ ...form, forOther: !!v })} className="mt-0.5 border-[#D4B77A] data-[state=checked]:bg-[#D4B77A] data-[state=checked]:text-[#14141A]" />
-              <span className="text-sm text-neutral-300 leading-relaxed">La cita es para <strong className="text-[#D4B77A]">otra persona</strong> (ej: mi hijo, un amigo)</span>
-            </label>
-            {form.forOther && (
-              <div data-testid="other-name-wrap" className="fade-up">
-                <Label className="text-xs tracking-overline uppercase text-neutral-500">Nombre de quien viene</Label>
-                <Input data-testid="input-other-name" value={form.otherName} onChange={(e) => setForm({ ...form, otherName: e.target.value })} className="mt-2 bg-[#1A1A1E] border-[#2A2A32] h-12" placeholder="Nombre y apellido" />
-              </div>
-            )}
-            <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="policy-checkbox-wrap">
-              <Checkbox data-testid="input-policy" checked={form.policy} onCheckedChange={(v) => setForm({ ...form, policy: !!v })} className="mt-1 border-[#D4B77A] data-[state=checked]:bg-[#D4B77A] data-[state=checked]:text-[#14141A]" />
-              <span className="text-sm text-neutral-300 leading-relaxed">
-                Acepto la <strong className="text-[#D4B77A]">política del 50%</strong>: si no me presento sin avisar, el barbero podrá cobrarme el 50% del servicio en mi próxima visita o bloquear futuras reservas. Cancelaciones permitidas hasta 12h antes.
-              </span>
-            </label>
-            <label className="flex items-start gap-3 p-4 rounded-md border border-[#2A2A32] bg-[#1A1A1E]" data-testid="whatsapp-optin-wrap">
-              <Checkbox data-testid="input-whatsapp-optin" checked={form.whatsapp} onCheckedChange={(v) => setForm({ ...form, whatsapp: !!v })} className="mt-1 border-[#25D366] data-[state=checked]:bg-[#25D366] data-[state=checked]:text-[#14141A]" />
-              <span className="text-sm text-neutral-300 leading-relaxed">
-                Acepto recibir <strong className="text-[#25D366]">confirmaciones y recordatorios de mi cita a través de WhatsApp</strong>. Puedo darme de baja en cualquier momento respondiendo STOP.
-              </span>
-            </label>
-            <p className="text-xs text-neutral-500 text-center">Máximo 6 citas activas por teléfono.</p>
-          </div>
-        )}
-
-        <div className="mt-10 flex gap-3">
-          {step > 0 && (
-            <Button data-testid="booking-prev" variant="outline" className="border-white/10 bg-transparent hover:bg-white/5" onClick={goBack}>
-              <ChevronLeft className="h-4 w-4 mr-1" /> Atrás
-            </Button>
-          )}
-          {step === 0 && (
-            <Button data-testid="booking-next" onClick={goNext} className="flex-1 h-12 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold btn-shine">
-              Siguiente <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
-          {step === 2 && (
-            <Button data-testid="booking-submit" onClick={submit} disabled={submitting || !form.policy || !form.whatsapp || !form.phone2.trim() || form.phone.trim() !== form.phone2.trim()} className="flex-1 h-12 bg-[#D4B77A] hover:bg-[#C2A366] text-[#14141A] font-semibold btn-shine">
-              {submitting ? "Reservando…" : items.length > 1 ? `Confirmar ${items.length} citas` : "Confirmar reserva"}
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+                className="mt-2 bg-[#1A1A1E
