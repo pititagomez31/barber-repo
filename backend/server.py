@@ -107,8 +107,21 @@ class ServiceIn(BaseModel):
 class ServiceOut(ServiceIn):
     id: str
 
+class ProfessionalIn(BaseModel):
+    name: str
+    role: str = "collaborator"
+    active: bool = True
+
+class ProfessionalOut(ProfessionalIn):
+    id: str
+
 class WorkingHoursIn(BaseModel):
     # 0=Mon ... 6=Sun; each day: {enabled, start "HH:MM", end "HH:MM"}
+    days: dict
+    professional_id: Optional[str] = None
+
+class ProfessionalScheduleIn(BaseModel):
+    professional_id: str
     days: dict
 
 class LunchBreakIn(BaseModel):
@@ -132,7 +145,14 @@ class ScheduleOverrideIn(BaseModel):
     end: str = "20:00"     # "HH:MM"
     reason: str = ""
 
+class ProfessionalBlockerIn(BlockerIn):
+    professional_id: Optional[str] = None
+
+class ProfessionalOverrideIn(ScheduleOverrideIn):
+    professional_id: Optional[str] = None
+
 class AppointmentIn(BaseModel):
+    professional_id: Optional[str] = None
     service_id: str
     date: str          # "YYYY-MM-DD"
     start: str         # "HH:MM"
@@ -146,6 +166,8 @@ class AppointmentIn(BaseModel):
 
 class AppointmentOut(BaseModel):
     id: str
+    professional_id: Optional[str] = None
+    professional_name: Optional[str] = ""
     service_id: str
     service_name: str
     price_eur: float
@@ -239,6 +261,33 @@ async def delete_service(sid: str, admin=Depends(get_current_admin)):
     return {"ok": True}
 
 
+# --- Professionals ---
+DEFAULT_PROFESSIONALS = [
+    {"id": "dorelitz", "name": "Dorelitz", "role": "admin", "active": True},
+    {"id": "arianna", "name": "Arianna", "role": "collaborator", "active": True},
+]
+
+@api.get("/professionals", response_model=List[ProfessionalOut])
+async def list_professionals(all: bool = False):
+    docs = await db.professionals.find({} if all else {"active": True}, {"_id": 0}).sort("name", 1).to_list(100)
+    return docs or DEFAULT_PROFESSIONALS
+
+@api.post("/professionals", response_model=ProfessionalOut)
+async def create_professional(body: ProfessionalIn, admin=Depends(get_current_admin)):
+    if admin.get("role") != "admin":
+        raise HTTPException(403, "No tienes permisos para gestionar profesionales")
+    doc = {"id": new_id(), **body.model_dump()}
+    await db.professionals.insert_one(doc.copy())
+    return doc
+
+@api.put("/professionals/{pid}", response_model=ProfessionalOut)
+async def update_professional(pid: str, body: ProfessionalIn, admin=Depends(get_current_admin)):
+    if admin.get("role") != "admin":
+        raise HTTPException(403, "No tienes permisos para gestionar profesionales")
+    res = await db.professionals.update_one({"id": pid}, {"$set": body.model_dump()})
+    if not res.matched_count: raise HTTPException(404, "Profesional no encontrado")
+    return await db.professionals.find_one({"id": pid}, {"_id": 0})
+
 # --- Working Hours ---
 @api.get("/working-hours")
 async def get_working_hours():
@@ -331,12 +380,14 @@ async def day_schedule(date: str):
 # --- Availability calculation ---
 SLOT_STEP = 15  # minutes granularity for booking
 
-async def _effective_schedule(date_str: str) -> dict:
-    """Horario efectivo de una fecha: la excepción manda sobre el horario semanal base."""
+async def _effective_schedule(date_str: str, professional_id: Optional[str] = None) -> dict:
+    """Horario efectivo por profesional; los datos antiguos siguen usando default."""
     d = datetime.strptime(date_str, "%Y-%m-%d").date()
     weekday = str(d.weekday())  # 0=Mon
     # PRIORIDAD 1: excepción por fecha
-    override = await db.schedule_overrides.find_one({"date": date_str}, {"_id": 0})
+    override = await db.schedule_overrides.find_one({"date": date_str, **({"professional_id": professional_id} if professional_id else {})}, {"_id": 0})
+    if not override and professional_id:
+        override = await db.schedule_overrides.find_one({"date": date_str, "professional_id": {"$exists": False}}, {"_id": 0})
     if override:
         return {
             "source": "override",
@@ -346,7 +397,9 @@ async def _effective_schedule(date_str: str) -> dict:
             "reason": override.get("reason", ""),
         }
     # PRIORIDAD 2: horario semanal base
-    wh_doc = await db.working_hours.find_one({"id": "default"}, {"_id": 0})
+    wh_doc = await db.working_hours.find_one({"id": professional_id or "default"}, {"_id": 0})
+    if not wh_doc and professional_id:
+        wh_doc = await db.working_hours.find_one({"id": "default"}, {"_id": 0})
     wh = (wh_doc or {}).get("days", DEFAULT_WORKING_HOURS)
     day_cfg = wh.get(weekday, DEFAULT_WORKING_HOURS[weekday])
     return {
@@ -357,13 +410,13 @@ async def _effective_schedule(date_str: str) -> dict:
         "reason": "",
     }
 
-async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
+async def _compute_slots(date_str: str, duration_min: int, professional_id: Optional[str] = None, exclude_id: Optional[str] = None) -> List[str]:
     try:
         d = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(400, "Fecha inválida")
 
-    eff = await _effective_schedule(date_str)
+    eff = await _effective_schedule(date_str, professional_id)
     if not eff["enabled"]:
         return []
 
@@ -372,12 +425,12 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
 
     # Existing appointments that day
     appts = await db.appointments.find(
-        {"date": date_str, "status": {"$ne": "cancelled"}}, {"_id": 0}
+        {"date": date_str, "status": {"$ne": "cancelled"}, **({"professional_id": professional_id} if professional_id else {})}, {"_id": 0}
     ).to_list(500)
-    busy = [(parse_hhmm(a["start"]), parse_hhmm(a["end"])) for a in appts]
+    busy = [(parse_hhmm(a["start"]), parse_hhmm(a["end"])) for a in appts if a.get("id") != exclude_id]
 
     # Blockers
-    blockers = await db.blockers.find({"date": date_str}, {"_id": 0}).to_list(200)
+    blockers = await db.blockers.find({"date": date_str, **({"$or": [{"professional_id": professional_id}, {"professional_id": {"$exists": False}}]} if professional_id else {})}, {"_id": 0}).to_list(200)
     for b in blockers:
         if not b.get("start") or not b.get("end"):
             return []  # full-day block
@@ -404,12 +457,12 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
     return slots
 
 @api.get("/availability")
-async def availability(service_id: str, date: str):
+async def availability(service_id: str, date: str, professional_id: Optional[str] = None):
     svc = await db.services.find_one({"id": service_id}, {"_id": 0})
     if not svc:
         raise HTTPException(404, "Servicio no encontrado")
-    slots = await _compute_slots(date, svc["duration_min"])
-    return {"date": date, "service_id": service_id, "duration_min": svc["duration_min"], "slots": slots}
+    slots = await _compute_slots(date, svc["duration_min"], professional_id)
+    return {"date": date, "service_id": service_id, "professional_id": professional_id, "duration_min": svc["duration_min"], "slots": slots}
 
 
 # --- Appointments ---
@@ -418,7 +471,7 @@ MAX_ACTIVE_APPTS_PER_PHONE = 6
 @api.post("/appointments", response_model=AppointmentOut)
 async def create_appointment(body: AppointmentIn):
     if not body.accepted_policy:
-        raise HTTPException(400, "Debes aceptar la política del 50%")
+        raise HTTPException(400, "Debes aceptar la política de no presentación (50% del servicio)")
     if not body.opt_in_whatsapp:
         raise HTTPException(400, "Debes aceptar recibir confirmaciones y recordatorios por WhatsApp")
     svc = await db.services.find_one({"id": body.service_id}, {"_id": 0})
@@ -439,7 +492,11 @@ async def create_appointment(body: AppointmentIn):
         )
 
     # Re-check availability atomically-ish
-    slots = await _compute_slots(body.date, svc["duration_min"])
+    professional_id = body.professional_id or "dorelitz"
+    professional = await db.professionals.find_one({"id": professional_id, "active": True}, {"_id": 0})
+    if not professional and professional_id != "dorelitz":
+        raise HTTPException(404, "Profesional no encontrado")
+    slots = await _compute_slots(body.date, svc["duration_min"], professional_id)
     if body.start not in slots:
         raise HTTPException(409, "Esa hora ya no está disponible, elige otra")
 
@@ -469,6 +526,7 @@ async def create_appointment(body: AppointmentIn):
         "start": body.start,
         "end": fmt_hhmm(end_m),
         "client_id": client_doc["id"],
+        "professional_id": getattr(body, "professional_id", None) or "dorelitz",
         "client_name": body.client_name,
         "client_nickname": body.client_nickname or "",
         "client_phone": body.client_phone,
@@ -556,6 +614,7 @@ async def force_appointment(body: ForceAppointmentIn, admin=Depends(get_current_
         "start": body.start,
         "end": fmt_hhmm(end_m),
         "client_id": client_doc["id"],
+        "professional_id": getattr(body, "professional_id", None) or "dorelitz",
         "client_name": body.client_name,
         "client_nickname": body.client_nickname or "",
         "client_phone": body.client_phone,
@@ -600,7 +659,7 @@ async def cancel_by_client(aid: str, phone: str):
     if appt["client_phone"] != phone:
         raise HTTPException(403, "Teléfono no coincide")
     appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
-    if (appt_time - datetime.now()).total_seconds() < 12 * 3600:
+    if (appt_time - datetime.now()).total_seconds() < 24 * 3600:
         raise HTTPException(400, "No puedes cancelar menos de 12 horas antes")
     await db.appointments.update_one({"id": aid}, {"$set": {"status": "cancelled"}})
     appt["status"] = "cancelled"
@@ -634,12 +693,12 @@ async def modificar_cita(aid: str, body: dict):
     
     # Check 12h rule
     appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
-    if (appt_time - datetime.now()).total_seconds() < 12 * 3600:
+    if (appt_time - datetime.now()).total_seconds() < 24 * 3600:
         raise HTTPException(400, "No puedes modificar menos de 12 horas antes")
     
     # Verify new slot available
     svc = await db.services.find_one({"id": appt["service_id"]}, {"_id": 0})
-    slots = await _compute_slots(new_date, svc["duration_min"])
+    slots = await _compute_slots(new_date, svc["duration_min"], appt.get("professional_id"), exclude_id=aid)
     if new_start not in slots:
         raise HTTPException(409, "La hora no está disponible")
     
