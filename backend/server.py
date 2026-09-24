@@ -329,7 +329,7 @@ async def day_schedule(date: str):
 
 
 # --- Availability calculation ---
-SLOT_STEP = 15  # minutes granularity for booking
+SLOT_STEP = 20  # minutes granularity for booking
 
 async def _effective_schedule(date_str: str) -> dict:
     """Horario efectivo de una fecha: la excepción manda sobre el horario semanal base."""
