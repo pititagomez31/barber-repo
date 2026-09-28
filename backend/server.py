@@ -427,7 +427,7 @@ async def create_appointment(body: AppointmentIn):
         raise HTTPException(404, "Servicio no encontrado")
 
     # Limit: max active future appointments per phone (multi-booking allowed)
-    today_str = datetime.now().strftime("%Y-%m-%d")
+        today_str = datetime.now(TZ_CANARIAS).strftime("%Y-%m-%d")
     active_count = await db.appointments.count_documents({
         "client_phone": body.client_phone,
         "status": {"$ne": "cancelled"},
