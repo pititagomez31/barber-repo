@@ -393,7 +393,7 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
 
        slots = []
     # If today (en hora de Canarias), don't offer past slots
-    now = datetime.now(TZ_CANARIAS)
+        now = datetime.now(TZ_CANARIAS)
     today_min = now.hour * 60 + now.minute if d == now.date() else -1
 
     t = start_m
