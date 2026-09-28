@@ -600,8 +600,8 @@ async def cancel_by_client(aid: str, phone: str):
         raise HTTPException(404, "Cita no encontrada")
     if appt["client_phone"] != phone:
         raise HTTPException(403, "Teléfono no coincide")
-    appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
-    if (appt_time - datetime.now()).total_seconds() < 12 * 3600:
+        appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
+    if (appt_time - datetime.now(TZ_CANARIAS).replace(tzinfo=None)).total_seconds() < 12 * 3600:
         raise HTTPException(400, "No puedes cancelar menos de 12 horas antes")
     await db.appointments.update_one({"id": aid}, {"$set": {"status": "cancelled"}})
     appt["status"] = "cancelled"
