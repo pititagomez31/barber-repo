@@ -808,7 +808,7 @@ WEBHOOK_CRON_SECRET = os.environ.get("WEBHOOK_CRON_SECRET", "")
 
 async def run_recordatorios() -> int:
     """Envía recordatorios a citas de mañana."""
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    tomorrow = (datetime.now(TZ_CANARIAS) + timedelta(days=1)).strftime("%Y-%m-%d")
     appts = await db.appointments.find({
         "date": tomorrow,
         "status": "confirmed",
