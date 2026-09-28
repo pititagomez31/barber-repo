@@ -386,16 +386,14 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
             return []  # full-day block
         busy.append((parse_hhmm(b["start"]), parse_hhmm(b["end"])))
 
-    # Descanso de almuerzo (se aplica todos los días si está activado)
-    wh_doc = await db.working_hours.find_one({"id": "default"}, {"_id": 0})
-    lunch = (wh_doc or {}).get("lunch") or {"enabled": False}
-    if lunch.get("enabled") and lunch.get("start") and lunch.get("end"):
-        busy.append((parse_hhmm(lunch["start"]), parse_hhmm(lunch["end"])))
+        # --- Almuerzo fijo del barbero: 14:00–15:00 solo lunes a viernes ---
+    # weekday: 0=lunes, 1=martes, 2=miércoles, 3=jueves, 4=viernes, 5=sábado, 6=domingo
+    if d.weekday() <= 4:
+        busy.append((parse_hhmm("14:00"), parse_hhmm("15:00")))
 
     slots = []
-    # If today, don't offer past slots (Europe/Madrid ~ UTC+1 winter; keep simple with local now)
-    now = datetime.now()
-    today_min = now.hour * 60 + now.minute if d == now.date() else -1
+    # If today (en hora de Canarias), don't offer past slots
+    now = datetime.now(TZ_CANARIAS)
 
     t = start_m
     while t + duration_min <= end_m:
