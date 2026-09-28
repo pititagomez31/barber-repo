@@ -391,14 +391,15 @@ async def _compute_slots(date_str: str, duration_min: int) -> List[str]:
     if d.weekday() <= 4:
         busy.append((parse_hhmm("14:00"), parse_hhmm("15:00")))
 
-       slots = []
+           slots = []
     # If today (en hora de Canarias), don't offer past slots
-        now = datetime.now(TZ_CANARIAS)
+    now = datetime.now(TZ_CANARIAS)
     today_min = now.hour * 60 + now.minute if d == now.date() else -1
 
     t = start_m
     while t + duration_min <= end_m:
         if today_min < t:
+            conflict = any(not (t + duration_min <= b0 or t >= b1) for (b0, b1) in busy)
             if not conflict:
                 slots.append(fmt_hhmm(t))
         t += SLOT_STEP
