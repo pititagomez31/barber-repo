@@ -49,6 +49,9 @@ api = APIRouter(prefix="/api")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("58barber")
 
+# --- Zona horaria del negocio (Canarias) ---
+TZ_CANARIAS = ZoneInfo("Atlantic/Canary")
+
 
 # --- Helpers ---
 def hash_pw(pw: str) -> str:
