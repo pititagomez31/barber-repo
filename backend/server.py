@@ -634,8 +634,8 @@ async def modificar_cita(aid: str, body: dict):
         raise HTTPException(403, "Teléfono no coincide")
     
     # Check 12h rule
-    appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
-    if (appt_time - datetime.now()).total_seconds() < 12 * 3600:
+        appt_time = datetime.fromisoformat(f"{appt['date']}T{appt['start']}")
+    if (appt_time - datetime.now(TZ_CANARIAS).replace(tzinfo=None)).total_seconds() < 12 * 3600:
         raise HTTPException(400, "No puedes modificar menos de 12 horas antes")
     
     # Verify new slot available
